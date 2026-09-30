@@ -69,6 +69,20 @@ canvas{width:100%;display:block;border-radius:10px;background:#f8fafc;border:1px
 .chip{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:99px;padding:1px 9px;font-size:12px;margin:0 4px 4px 0}
 .tag.mini{color:#7c3aed;border-color:#7c3aed}
 .flaw{margin:8px 0}
+.hero{border:2px solid var(--acc);padding:20px}
+.hero.detour{border-color:var(--warn)}
+.eyebrow{color:var(--acc);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.hero.detour .eyebrow{color:var(--warn)}
+.hero .lesson{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:4px 14px;margin:10px 0;background:var(--panel2)}
+.steps{list-style:none;padding:0;margin:6px 0 0}
+.steps li{display:flex;gap:8px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--line)}
+.steps li.cur{background:var(--panel2);border-radius:8px;font-weight:600}
+.steps li.done{color:var(--mute)}
+.ico{width:22px;text-align:center}
+.pathbar{display:flex;align-items:center;gap:12px;padding:10px 14px;margin-bottom:14px}
+details.stage summary{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+details.stage .bar{flex:1;min-width:80px}
+button.sm{padding:3px 10px;font-size:13px}
 @media(max-width:560px){nav button{padding:6px 8px;font-size:14px}}
 </style>
 </head>
@@ -600,28 +614,34 @@ function finish(){
   if(r.n>=5&&r.alt>=0.85&&r.cps>S.best&&cfg.type!=='wave')S.best=r.cps;
   if(!S.days.includes(today()))S.days.push(today());
   let levelMsg='';
+  const P=pathState();
   if(ev){
     const st=levelState(cfg.level),L=LEVELS.find(l=>l.id===cfg.level);
     if(st.done){levelMsg='<div class="insight good">Level already complete. This was a practice run.</div>';}
-    else if(ev.pass){st.streak++;
+    else if(ev.pass){st.streak++;P.failCount[cfg.level]=0;P.fail=null;
       if(st.streak>=L.need){st.done=true;levelMsg=`<div class="insight good"><b>Level complete!</b> You passed ${L.need} in a row.</div>`;}
+      else if(ev.margin&&st.streak===1){st.done=true;levelMsg='<div class="insight good"><b>Fast-tracked!</b> You beat every target by a wide margin on your first pass, so the repeat passes are waived.</div>';}
       else levelMsg=`<div class="insight good">Passed! ${st.streak}/${L.need} in a row needed. Do it again to prove consistency.</div>`;}
-    else{st.streak=0;levelMsg='<div class="insight warn">Not quite. Consistency counts, so your in-a-row streak reset. Check the tips below and retry.</div>';}
+    else{st.streak=0;P.failCount[cfg.level]=(P.failCount[cfg.level]||0)+1;
+      const bad=ev.checks.filter(x=>!x.ok);P.fail={level:cfg.level,flaw:bad.length?bad[0].k:'uneven',checks:bad.map(x=>x.t),done:false};
+      levelMsg='<div class="insight warn">Not quite. Consistency counts, so your in-a-row streak reset. '+(P.failCount[cfg.level]>=2?'Your path will insert a targeted drill before the next attempt.':'Check the tips below and retry.')+'</div>';}
   }
+  if(!cfg.placement){if(cfg.detour){P.sinceFix=0;if(P.fail)P.fail.done=true;}else P.sinceFix=(P.sinceFix||0)+1;}
   save();
   showResult(r,cfg,ev,levelMsg);
   if(D&&D.onDone)D.onDone(r);
 }
 function evalLevel(L,r){
   const p=L.pass,c=[];
-  if(p.cps!==undefined)c.push({t:`Speed ≥ ${p.cps} CPS`,v:f1(r.cps),ok:r.cps>=p.cps});
-  if(p.cv!==undefined)c.push({t:`Variation ≤ ${pct(p.cv)}%`,v:pct(r.cv)+'%',ok:r.cv<=p.cv});
-  if(p.alt!==undefined)c.push({t:`Alternation ≥ ${pct(p.alt)}%`,v:pct(r.alt)+'%',ok:r.alt>=p.alt});
-  if(p.drift!==undefined)c.push({t:`Drift within ±${pct(p.drift)}%`,v:(r.drift>=0?'+':'')+pct(r.drift)+'%',ok:Math.abs(r.drift)<=p.drift});
-  if(p.hit!==undefined&&r.metro)c.push({t:`On-beat ≥ ${pct(p.hit)}%`,v:pct(r.metro.hit)+'%',ok:r.metro.hit>=p.hit});
-  if(p.mae!==undefined&&r.metro)c.push({t:`Avg timing error ≤ ${p.mae}ms`,v:Math.round(r.metro.mae)+'ms',ok:r.metro.mae<=p.mae});
-  if(p.survive!==undefined)c.push({t:`Clear the ${p.survive}s course`,v:pct(r.progress||0)+'%',ok:!!(r.wave&&r.wave.win)});
-  return {checks:c,pass:c.length>0&&c.every(x=>x.ok)};
+  const add=(t,v,ok,m,k)=>c.push({t,v,ok,m,k});
+  if(p.cps!==undefined)add(`Speed ≥ ${p.cps} CPS`,f1(r.cps),r.cps>=p.cps,r.cps>=p.cps*1.2,'slow');
+  if(p.cv!==undefined)add(`Variation ≤ ${pct(p.cv)}%`,pct(r.cv)+'%',r.cv<=p.cv,r.cv<=p.cv*0.8,'uneven');
+  if(p.alt!==undefined)add(`Alternation ≥ ${pct(p.alt)}%`,pct(r.alt)+'%',r.alt>=p.alt,r.alt>=Math.min(0.99,p.alt+0.04),'alt');
+  if(p.drift!==undefined)add(`Drift within ±${pct(p.drift)}%`,(r.drift>=0?'+':'')+pct(r.drift)+'%',Math.abs(r.drift)<=p.drift,Math.abs(r.drift)<=p.drift*0.6,r.drift>=0?'fade':'rush');
+  if(p.hit!==undefined&&r.metro)add(`On-beat ≥ ${pct(p.hit)}%`,pct(r.metro.hit)+'%',r.metro.hit>=p.hit,r.metro.hit>=Math.min(0.97,p.hit+0.08),'uneven');
+  if(p.mae!==undefined&&r.metro)add(`Avg timing error ≤ ${p.mae}ms`,Math.round(r.metro.mae)+'ms',r.metro.mae<=p.mae,r.metro.mae<=p.mae*0.75,r.metro.bias<-15?'rush':'uneven');
+  if(p.survive!==undefined){const win=!!(r.wave&&r.wave.win);add(`Clear the ${p.survive}s course`,pct(r.progress||0)+'%',win,win,'steer');}
+  return {checks:c,pass:c.length>0&&c.every(x=>x.ok),margin:c.length>0&&c.every(x=>x.m)};
 }
 function showResult(r,cfg,ev,levelMsg){
   const R=$('#result');
@@ -639,7 +659,7 @@ function showResult(r,cfg,ev,levelMsg){
   h+='<h3 style="margin-top:14px">Your rhythm</h3><canvas id="rc" height="160"></canvas>';
   h+='<div class="row" style="margin-top:14px"><button class="primary" id="rRetry">Retry</button>';
   if(D&&D.queue&&D.queue.length)h+='<button class="primary" id="rNext">Next drill ▶</button>';
-  if(r.wave)h+='<button class="primary" id="rCoach">Coach\'s next pick ▶</button>';
+  if(!(D&&D.queue&&D.queue.length)&&!cfg.placement)h+='<button class="primary" id="rPath">Continue path ▶</button>';
   h+='<button id="rClose">Close</button></div>';
   R.innerHTML=h;R.classList.add('on');
   $('#pad').style.display='none';$('#dStop').style.display='none';$('#msg').textContent='';
@@ -647,7 +667,7 @@ function showResult(r,cfg,ev,levelMsg){
   const cfg0=D.cfg,onDone=D.onDone,queue=D.queue,onQuit=D.onQuit;
   $('#rRetry').onclick=()=>{openDrill(cfg0,onDone);D.queue=queue;D.onQuit=onQuit;};
   if($('#rNext'))$('#rNext').onclick=()=>{runQueue(queue);};
-  if($('#rCoach'))$('#rCoach').onclick=()=>{const pk=coachPick();openDrill(pk,null);};
+  if($('#rPath'))$('#rPath').onclick=()=>continuePath();
   $('#rClose').onclick=()=>{closeDrill();renderAll();};
   R.scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -666,7 +686,7 @@ function drawRhythm(r){
 function runQueue(q){
   if(!q||!q.length){closeDrill();renderAll();return;}
   const rest=q.slice(),cfg=rest.shift();
-  openDrill(cfg,null);D.queue=rest;
+  openDrill(cfg,cfg.onDone||null);D.queue=rest;
 }
 function dailyQueue(){
   const best=S.best||4,m=clamp(Math.round(best*0.7),3,8);
@@ -708,37 +728,193 @@ function go(t,extra){
   if(tab==='tools')closeTools();
   tab=t;renderNav();document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+t));
   ({path:renderPath,learn:renderLearn,practice:renderPractice,wave:renderWave,tools:renderTools,stats:renderStats,settings:renderSettings})[t](extra);
+  if(t!=='path'&&t!=='settings'){
+    const nx=nextStep();
+    $('#view-'+t).insertAdjacentHTML('afterbegin',`<div class="card pathbar"><span class="space">▶ Next on your path: <b>${stepTitle(nx)}</b></span><button class="primary sm" id="pbGo">Go to path</button></div>`);
+    $('#pbGo').onclick=()=>go('path');
+  }
   window.scrollTo(0,0);
 }
 function renderAll(){go(tab);}
 
+/* ============================== adaptive path ============================== */
+const STAGES=[
+ {name:'Foundations',blurb:'Two fingers, clean alternation, finding a beat.',steps:[
+   {t:'lesson',id:'l-basics',title:'What alternating is, setup and finger mechanics',les:[0,1,2]},
+   {t:'test',level:'basics'},
+   {t:'lesson',id:'l-rhythm',title:'Rhythm before speed',les:[3]},
+   {t:'test',level:'beat'}]},
+ {name:'Speed & Rhythm',blurb:'Get fast without losing evenness.',steps:[
+   {t:'lesson',id:'l-speed',title:'Building speed safely',les:[4]},
+   {t:'test',level:'smooth'},{t:'test',level:'lock'}]},
+ {name:'Stamina',blurb:'Hold your speed for real spam lengths.',steps:[
+   {t:'lesson',id:'l-stamina',title:'Endurance and relaxation',les:[5]},
+   {t:'test',level:'endure'}]},
+ {name:'Wave Fundamentals',blurb:'Hold to go up, release to go down. Learn the physics, then steer.',steps:[
+   {t:'lesson',id:'l-wave',title:'How the wave really moves',les:[8]},
+   {t:'wave',w:'w1'},{t:'wave',w:'w2'},{t:'wave',w:'w3'},{t:'test',level:'wave'}]},
+ {name:'Wave Precision',blurb:'Tighter gaps and more corridor shapes.',steps:[
+   {t:'wave',w:'w4'},{t:'wave',w:'w5'},{t:'wave',w:'w6'},{t:'wave',w:'w7'}]},
+ {name:'Mini & Slopes',blurb:'Mini waves, steep slopes, funnels and 2x speed.',steps:[
+   {t:'wave',w:'w8'},{t:'wave',w:'w9'},{t:'wave',w:'w10'},{t:'wave',w:'w11'}]},
+ {name:'Portals & Speed Changes',blurb:'Speed and size portals, slaloms and drifting corridors.',steps:[
+   {t:'wave',w:'w12'},{t:'wave',w:'w13'},{t:'wave',w:'w14'},{t:'wave',w:'w15'},{t:'wave',w:'w16'}]},
+ {name:'Mastery',blurb:'Gauntlets and endurance, then the final GD Ready test.',steps:[
+   {t:'lesson',id:'l-gd',title:'Taking it into Geometry Dash',les:[6,7]},
+   {t:'wave',w:'w17'},{t:'wave',w:'w18'},{t:'wave',w:'w19',stars:2},{t:'wave',w:'w20',stars:2},{t:'test',level:'ready'}]}
+];
+function pathState(){return S.path||(S.path={placed:false,read:{},skipped:{},fail:null,failCount:{},sinceFix:0});}
+function allSteps(){return STAGES.flatMap(g=>g.steps);}
+function stageOf(st){return STAGES.find(g=>g.steps.includes(st));}
+function stepKey(st){return st.t==='lesson'?'L:'+st.id:st.t==='test'?'T:'+st.level:'W:'+st.w;}
+function stepDone(st){
+  const P=pathState();
+  if(st.t==='lesson'){if(P.read[st.id])return true;const g=stageOf(st),i=g.steps.indexOf(st);return g.steps.slice(i+1).some(x=>x.t!=='lesson'&&stepDone(x));}
+  if(st.t==='test')return levelState(st.level).done;
+  return (waveModel().stars[st.w]||0)>=(st.stars||1)||!!P.skipped[stepKey(st)];
+}
+function normalizePath(){
+  const P=pathState(),wl=waveLevel();
+  allSteps().forEach(st=>{if(st.t!=='wave')return;
+    if((waveModel().stars[st.w]||0)>=(st.stars||1))return;
+    const c=CATALOG.find(x=>x.id===st.w);if(wl>=diffOf(catalogCfg(c))*10+2.5)P.skipped[stepKey(st)]=true;});
+}
+function stepTitle(nx){
+  switch(nx.type){
+    case 'placement':return 'Placement (2 short drills)';
+    case 'complete':return 'Path complete';
+    case 'detour':return 'Coach detour: '+nx.cfg.name;
+    case 'lesson':return 'Lesson: '+nx.step.title;
+    case 'test':return 'Test: '+LEVELS.find(l=>l.id===nx.step.level).name;
+    case 'wave':return 'Wave: '+CATALOG.find(c=>c.id===nx.step.w).name;
+  }
+}
+const WAVE_FLAWS=['steer','timing','shift','tempo','mini'];
+function remedialFor(k){
+  if(WAVE_FLAWS.includes(k))return coachPick();
+  const best=S.best||4,weak=avg(S.sessions.slice(-10).map(x=>x.bal||0))>0?'R':'L';
+  switch(k){
+    case 'alt':return {type:'metro',name:'Clean alternation: slow beat',cps:3,beats:20,why:'A slow beat makes every double-hit obvious. Focus on see-sawing cleanly.'};
+    case 'uneven':return {type:'metro',name:'Rhythm lock',cps:clamp(Math.round(best*0.7),3,7),beats:32,why:'Even spacing is trained against a beat, not by feel.'};
+    case 'slow':return {type:'free',dur:0,taps:20,name:'Speed sprint: 20 taps',why:'Short bursts teach your hands what fast feels like.'};
+    case 'fade':return {type:'free',dur:20,name:'Stamina: 20s relaxed',why:'Stay loose and keep the same speed from start to finish.'};
+    case 'rush':return {type:'metro',name:'Hold the beat',cps:4,beats:32,why:'Wait for the click instead of running ahead of it.'};
+    case 'balance':return {type:'free',dur:12,name:`Weak-hand lead (${weak})`,why:`Start every run with your ${weak} hand and match its timing to the other.`};
+    default:return {type:'free',dur:10,name:'Free alternate 10s'};
+  }
+}
+function nextStep(){
+  const P=pathState();normalizePath();
+  if(!P.placed)return {type:'placement'};
+  const cur=allSteps().find(st=>!stepDone(st));
+  if(!cur)return {type:'complete'};
+  const fl=diagnose();
+  if(cur.t==='test'&&P.fail&&P.fail.level===cur.level&&!P.fail.done&&(P.failCount[cur.level]||0)>=2){
+    const lv=LEVELS.find(l=>l.id===cur.level);
+    return {type:'detour',step:cur,cfg:remedialFor(P.fail.flaw),reason:`You have missed "${lv.name}" twice (${P.fail.checks.join(', ')||'see the result'}). Here is a targeted drill before you retry.`};
+  }
+  const f=fl.find(x=>x.score>=0.55);
+  if(f&&cur.t!=='lesson'&&(P.sinceFix||0)>=3)
+    return {type:'detour',step:cur,cfg:remedialFor(f.k),reason:`The coach noticed a pattern in your recent runs: ${FLAWS[f.k].label.toLowerCase()}. One targeted drill now saves repeated failures later.`};
+  return {type:cur.t,step:cur};
+}
+function critLines(p){
+  const o=[];
+  if(p.cps!==undefined)o.push(`Speed ≥ ${p.cps} CPS`);if(p.cv!==undefined)o.push(`Variation ≤ ${pct(p.cv)}%`);
+  if(p.alt!==undefined)o.push(`Alternation ≥ ${pct(p.alt)}%`);if(p.drift!==undefined)o.push(`Drift within ±${pct(p.drift)}%`);
+  if(p.hit!==undefined)o.push(`On-beat ≥ ${pct(p.hit)}%`);if(p.mae!==undefined)o.push(`Timing error ≤ ${p.mae}ms`);
+  if(p.survive!==undefined)o.push(`Clear the ${p.survive}s wave course`);
+  return o;
+}
+function continuePath(){
+  const n=nextStep();
+  if(n.type==='test'){const L=LEVELS.find(l=>l.id===n.step.level);openDrill(Object.assign({level:L.id},L.drill),null);}
+  else if(n.type==='wave'){const c=CATALOG.find(x=>x.id===n.step.w);openDrill(catalogCfg(c,c.tip),null);}
+  else if(n.type==='detour')openDrill(Object.assign({detour:true},n.cfg),null);
+  else{closeDrill();go('path');}
+}
+function startPlacement(){
+  let r1=null;
+  const c1={type:'free',dur:10,name:'Placement 1/2: 10s free alternate',placement:true};
+  const c2={type:'metro',cps:5,beats:20,name:'Placement 2/2: metronome at 5 CPS',placement:true,onDone:r2=>{
+    const placed=[];
+    [['basics',r1],['beat',r2],['smooth',r1],['lock',r2]].every(([id,rr])=>{
+      const L=LEVELS.find(l=>l.id===id);if(rr&&evalLevel(L,rr).pass){levelState(id).done=true;placed.push(L.name);return true;}return false;});
+    pathState().placed=true;save();
+    $('#result').insertAdjacentHTML('afterbegin',`<div class="insight good"><b>Placement complete.</b> ${placed.length?'You skip ahead past: '+placed.join(', ')+'.':'You start from the beginning.'} Your path is ready.</div>`);
+    const b=document.createElement('button');b.className='primary';b.textContent='Go to my path ▶';b.onclick=()=>{closeDrill();go('path');};
+    $('#result').appendChild(b);
+  }};
+  openDrill(c1,r=>{r1=r;});D.queue=[c2];
+}
+function heroHtml(nx){
+  const all=allSteps(),idx=nx.step?all.indexOf(nx.step)+1:0,total=all.length;
+  const eb=nx.step?`Step ${idx} of ${total} · ${stageOf(nx.step).name}`:'';
+  switch(nx.type){
+    case 'placement':return `<div class="eyebrow">Start here</div><h2>Find your starting point</h2>
+      <p class="mute">Two short drills (about 40 seconds): a free-alternate test and a metronome test. Your results skip you past anything you can already do, so you only train what you need.</p>
+      <div class="row"><button class="primary" id="hGo">Take the placement</button><button class="ghost" id="hSkip">Start from the beginning instead</button></div>`;
+    case 'complete':return `<div class="eyebrow">Path complete</div><h2>🏆 You can alternate consistently</h2>
+      <p class="mute">Every stage is done. Keep your edge with the daily session, replay gauntlets, and raise your wave level.</p>
+      <div class="row"><button class="primary" id="hDaily">▶ Daily session</button></div>`;
+    case 'lesson':return `<div class="eyebrow">${eb}</div><h2>Read: ${nx.step.title}</h2>
+      <div class="lesson">${nx.step.les.map(i=>`<h3 style="margin-top:10px">${LESSONS[i].t}</h3>${LESSONS[i].b}`).join('')}</div>
+      <div class="row"><button class="primary" id="hGo">Got it, continue ▶</button></div>`;
+    case 'test':{const L=LEVELS.find(l=>l.id===nx.step.level),st=levelState(L.id);
+      return `<div class="eyebrow">${eb}</div><h2>Test: ${L.name}</h2><p class="mute">${L.focus}</p>
+      <div>${critLines(L.pass).map(c=>`<span class="chip">${c}</span>`).join('')}</div>
+      <p class="small mute">Pass <b>${L.need} in a row</b> to prove it is reliable. Beat every target by a wide margin on your first pass and you are fast-tracked.</p>
+      <div class="pips" style="margin:6px 0 12px">${Array.from({length:L.need},(_,k)=>`<span class="pip ${k<st.streak?'on':''}"></span>`).join('')}</div>
+      <div class="row"><button class="primary" id="hGo">Take the test</button><button class="ghost" id="hLesson">Review lesson</button></div>`;}
+    case 'wave':{const c=CATALOG.find(x=>x.id===nx.step.w),cf=catalogCfg(c),W=waveModel();
+      return `<div class="eyebrow">${eb}</div><h2>Wave: ${c.name}</h2><p class="mute">${c.tip}</p>
+      <div>${pickChips(cf)}</div>
+      <p class="small mute">Clear it${(nx.step.stars||1)>1?' with at least '+nx.step.stars+' stars':''} to move on. Current: ${'★'.repeat(W.stars[c.id]||0)+'☆'.repeat(3-(W.stars[c.id]||0))}. The steps you are already too good for are skipped automatically.</p>
+      <div class="row"><button class="primary" id="hGo">Play</button></div>`;}
+    case 'detour':return `<div class="eyebrow">Coach detour</div><h2>${nx.cfg.name}</h2><p class="mute">${nx.reason}</p>
+      ${nx.cfg.why?`<p class="small mute">${nx.cfg.why}</p>`:''}
+      <div class="row"><button class="primary" id="hGo">Start the drill</button><button class="ghost" id="hSkip">Skip the detour</button></div>`;
+  }
+}
 function renderPath(){
-  const cur=currentLevel(),r=rating();
-  let h=`<div class="card"><h2>Your path to consistent alternating</h2>
-  <p class="mute">Pass each level's test <b>several times in a row</b> to unlock the next. That's how you know the skill is reliable, not a lucky run. Read the lesson first, then take the test.</p>
-  <div class="stats">
-   <div class="stat"><span class="mute small">Rating</span><b>${Math.round(r)} <span class="small mute">${tierOf(r)}</span></b></div>
+  const P=pathState(),nx=nextStep(),all=allSteps(),done=all.filter(stepDone).length,rt=rating(),fl=diagnose(),top=fl[0];
+  let h=`<div class="card hero ${nx.type==='detour'?'detour':''}">${heroHtml(nx)}</div>`;
+  h+=`<div class="stats" style="margin-bottom:14px">
+   <div class="stat"><span class="mute small">Path progress</span><b>${done}/${all.length}</b><div class="bar"><i style="width:${Math.round(done/all.length*100)}%"></i></div></div>
+   <div class="stat"><span class="mute small">Rating</span><b>${Math.round(rt)}</b><span class="small mute">${tierOf(rt)}</span></div>
    <div class="stat"><span class="mute small">Best clean CPS</span><b>${f1(S.best)}</b></div>
-   <div class="stat"><span class="mute small">Level</span><b>${Math.min(cur+1,LEVELS.length)}/${LEVELS.length}</b></div>
+   <div class="stat"><span class="mute small">Wave level</span><b>${f1(waveLevel())}</b></div>
    <div class="stat"><span class="mute small">Day streak</span><b>${dayStreak()}</b></div>
-  </div>
-  <div class="row" style="margin-top:12px"><button class="primary" id="pDaily">▶ Start daily session</button><span class="mute small">~5 min warm-up tailored to you</span></div></div>`;
-  if(cur>=LEVELS.length)h+='<div class="card"><h3>🏆 Path complete!</h3><p>You can alternate consistently. Keep your edge with the daily session, and try raising the tempos in Practice.</p></div>';
-  h+='<div class="grid">';
-  LEVELS.forEach((L,i)=>{
-    const st=levelState(L.id),locked=i>cur;
-    h+=`<div class="card lvl ${locked?'locked':''} ${i===cur?'current':''}">
-      <div class="row"><b>${i+1}. ${L.name}</b><span class="space"></span>${st.done?'<span class="tag good">complete</span>':locked?'<span class="tag lock">locked</span>':'<span class="tag">current</span>'}</div>
-      <p class="mute small" style="margin:6px 0">${L.focus}</p>
-      <div class="small mute">Pass ${L.need} in a row</div>
-      <div class="pips" style="margin:6px 0 10px">${Array.from({length:L.need},(_, k)=>`<span class="pip ${st.done||k<st.streak?'on':''}"></span>`).join('')}</div>
-      <div class="row"><button class="primary" data-start="${i}" ${locked?'disabled':''}>${st.done?'Retake test':'Take test'}</button><button class="ghost" data-lesson="${L.lesson}">Lesson</button></div></div>`;
+   <div class="stat"><span class="mute small">Coach focus</span><b style="font-size:15px">${top?FLAWS[top.k].label:'None yet'}</b></div></div>`;
+  h+='<h2 style="margin:18px 0 8px">Your roadmap</h2>';
+  STAGES.forEach((g,gi)=>{
+    const d=g.steps.filter(stepDone).length,cur=nx.step&&g.steps.includes(nx.step);
+    h+=`<details class="stage card" ${cur?'open':''}><summary><b>${gi+1}. ${g.name}</b><span class="small mute">${d}/${g.steps.length}</span><span class="bar"><i style="width:${Math.round(d/g.steps.length*100)}%;background:var(--good)"></i></span></summary>
+     <p class="small mute" style="margin:6px 0 0">${g.blurb}</p><ul class="steps">${g.steps.map(st=>{
+       const dn=stepDone(st),isCur=st===nx.step,sk=P.skipped[stepKey(st)]&&st.t==='wave'&&!((waveModel().stars[st.w]||0)>=(st.stars||1));
+       const title=stepTitle({type:st.t,step:st}).replace(/^(Lesson|Test|Wave): /,'');
+       const kind=st.t==='lesson'?'Lesson':st.t==='test'?'Test':'Wave';
+       return `<li class="${dn?'done':isCur?'cur':''}"><span class="ico">${sk?'⏭':dn?'✔':isCur?'●':'○'}</span><span class="tag">${kind}</span><span class="space">${title}${sk?' <span class="small mute">(skipped: above your level)</span>':''}</span><button class="ghost sm" data-step="${stepKey(st)}">${st.t==='lesson'?'Read':dn?'Replay':'Play'}</button></li>`;}).join('')}</ul></details>`;
   });
-  h+='</div>';
+  h+=`<div class="card"><h3>Quick sessions</h3><p class="small mute">Optional extras that also feed your coach.</p>
+   <div class="row"><button id="qDaily">▶ Daily session (5 min)</button><button class="ghost" data-go="practice">Practice library</button><button class="ghost" data-go="wave">Wave Academy</button><button class="ghost" data-go="tools">Tools</button><button class="ghost" data-go="stats">Analysis</button></div></div>`;
   $('#view-path').innerHTML=h;
-  $('#pDaily').onclick=()=>runQueue(dailyQueue());
-  $('#view-path').querySelectorAll('[data-start]').forEach(b=>b.onclick=()=>{const L=LEVELS[+b.dataset.start];openDrill(Object.assign({level:L.id},L.drill),null);});
-  $('#view-path').querySelectorAll('[data-lesson]').forEach(b=>b.onclick=()=>go('learn',+b.dataset.lesson));
+  const hero=$('#view-path .hero');
+  const on=(id,fn)=>{const el=hero.querySelector('#'+id);if(el)el.onclick=fn;};
+  on('hGo',()=>{
+    if(nx.type==='placement')startPlacement();
+    else if(nx.type==='lesson'){P.read[nx.step.id]=true;save();renderPath();window.scrollTo(0,0);}
+    else continuePath();});
+  on('hSkip',()=>{if(nx.type==='placement'){P.placed=true;save();renderPath();}else{P.sinceFix=0;if(P.fail)P.fail.done=true;save();renderPath();}});
+  on('hDaily',()=>runQueue(dailyQueue()));
+  on('hLesson',()=>{const L=LEVELS.find(l=>l.id===nx.step.level);go('learn',L.lesson);});
+  $('#qDaily').onclick=()=>runQueue(dailyQueue());
+  $('#view-path').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
+  $('#view-path').querySelectorAll('[data-step]').forEach(b=>b.onclick=()=>{
+    const st=allSteps().find(x=>stepKey(x)===b.dataset.step);
+    if(st.t==='lesson')go('learn',st.les[0]);
+    else if(st.t==='test'){const L=LEVELS.find(l=>l.id===st.level);openDrill(Object.assign({level:L.id},L.drill),null);}
+    else{const c=CATALOG.find(x=>x.id===st.w);openDrill(catalogCfg(c,c.tip),null);}});
 }
 function dayStreak(){
   let n=0;const d=new Date();
