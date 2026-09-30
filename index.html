@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GD Alternator Trainer</title>
+<style>
+:root{
+  --bg:#f5f7fa;--panel:#ffffff;--panel2:#f0f3f8;--line:#dde2ec;--text:#1b2233;--mute:#5f6b82;
+  --acc:#2563eb;--L:#2563eb;--R:#d97706;--good:#16a34a;--bad:#dc2626;--warn:#d97706;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:10px;padding:8px 14px}
+button:hover{border-color:var(--acc)}
+button.primary{background:var(--acc);color:#fff;border-color:var(--acc);font-weight:600}
+button.ghost{background:transparent}
+button:disabled{opacity:.4;cursor:not-allowed}
+input,select{font:inherit;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+input[type=range]{padding:0;width:100%}
+h1,h2,h3{margin:0 0 .4em}
+header{position:sticky;top:0;z-index:5;background:var(--panel);box-shadow:0 1px 2px rgba(16,24,40,.04);border-bottom:1px solid var(--line)}
+.wrap{max-width:980px;margin:0 auto;padding:0 16px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;flex-wrap:wrap}
+.brand{font-weight:700;font-size:18px}.brand span{color:var(--acc)}
+nav{display:flex;gap:4px;flex-wrap:wrap}
+nav button{border:none;background:transparent;color:var(--mute);padding:6px 12px}
+nav button.on{background:var(--panel2);color:var(--text)}
+main{padding:20px 0 60px}
+.view{display:none}.view.on{display:block}
+.card{box-shadow:0 1px 3px rgba(16,24,40,.06);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+.mute{color:var(--mute)}.small{font-size:13px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.space{flex:1}
+.tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;border:1px solid var(--line);color:var(--mute)}
+.tag.good{color:var(--good);border-color:var(--good)}.tag.lock{opacity:.6}
+.pips{display:flex;gap:5px}.pip{width:12px;height:12px;border-radius:50%;border:2px solid var(--line)}.pip.on{background:var(--good);border-color:var(--good)}
+.lvl.locked{opacity:.5}
+.lvl.current{border-color:var(--acc)}
+.stat{background:var(--panel2);border-radius:10px;padding:10px 12px}
+.stat b{display:block;font-size:22px}
+.stats{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+details{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:10px}
+summary{cursor:pointer;font-weight:600}
+details p,details li{color:#2d3750}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
+.kbd{display:inline-block;border:1px solid var(--line);border-bottom-width:3px;border-radius:6px;padding:0 8px;background:var(--panel2);font-family:monospace}
+canvas{width:100%;display:block;border-radius:10px;background:#f8fafc;border:1px solid var(--line)}
+.ok{color:var(--good)}.no{color:var(--bad)}
+/* drill overlay */
+#drill{position:fixed;inset:0;background:var(--bg);z-index:20;display:none;flex-direction:column;overflow:auto}
+#drill.on{display:flex}
+#drill .inner{max-width:760px;width:100%;margin:0 auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px;flex:1}
+.hud{display:flex;gap:18px;flex-wrap:wrap}.hud div{min-width:70px}.hud b{font-size:22px;display:block;line-height:1.1}
+#msg{text-align:center;min-height:26px;color:var(--mute)}
+.pad{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1;min-height:170px}
+.pad button{font-size:34px;font-weight:700;touch-action:none;user-select:none;-webkit-user-select:none;border-width:2px;transition:background .06s}
+.pad button small{display:block;font-size:13px;font-weight:400;color:var(--mute)}
+#padL{border-color:var(--L);color:var(--L)}#padR{border-color:var(--R);color:var(--R)}
+#padL.hit{background:rgba(37,99,235,.3)}#padR.hit{background:rgba(217,119,6,.3)}
+.pad button.bad{background:rgba(220,38,38,.35)}
+#result{display:none}
+#result.on{display:block}
+.insight{padding:8px 12px;border-left:3px solid var(--acc);background:var(--panel2);border-radius:6px;margin:6px 0}
+.insight.warn{border-color:var(--warn)}.insight.good{border-color:var(--good)}
+.bar{height:8px;background:var(--panel2);border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}
+@media(max-width:560px){nav button{padding:6px 8px;font-size:14px}}
+</style>
+</head>
+<body>
+<header><div class="wrap top">
+  <div class="brand">GD <span>Alternator</span> Trainer</div>
+  <nav id="nav"></nav>
+</div></header>
+
+<main class="wrap">
+  <section id="view-path" class="view"></section>
+  <section id="view-learn" class="view"></section>
+  <section id="view-practice" class="view"></section>
+  <section id="view-tools" class="view"></section>
+  <section id="view-stats" class="view"></section>
+  <section id="view-settings" class="view"></section>
+</main>
+
+<div id="drill"><div class="inner">
+  <div class="row"><b id="dName"></b><span class="space"></span><button id="dStop" class="ghost">Stop &amp; score</button><button id="dQuit" class="ghost">Quit</button></div>
+  <div class="hud">
+    <div><span class="mute small">Time</span><b id="hTime">0.0</b></div>
+    <div><span class="mute small">Taps</span><b id="hTaps">0</b></div>
+    <div><span class="mute small">CPS now</span><b id="hCps">0.0</b></div>
+    <div><span class="mute small">Double-hits</span><b id="hDbl">0</b></div>
+  </div>
+  <canvas id="stage" height="200"></canvas>
+  <div id="msg"></div>
+  <div class="pad" id="pad">
+    <button id="padL">L<small id="kL"></small></button>
+    <button id="padR">R<small id="kR"></small></button>
+  </div>
+  <div id="result" class="card"></div>
+</div></div>
+
+<script>
+'use strict';
+/* ============================== storage ============================== */
+const KEY='gdalt_v1';
+const DEF={keys:['KeyF','KeyJ'],offset:0,vol:0.6,sessions:[],prog:{},days:[],best:0};
+function load(){try{const o=JSON.parse(localStorage.getItem(KEY));return Object.assign({},DEF,o||{},{keys:(o&&o.keys)||DEF.keys.slice()});}catch(e){return JSON.parse(JSON.stringify(DEF));}}
+let S=load();
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+const $=(s,r=document)=>r.querySelector(s);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const f1=v=>(Math.round(v*10)/10).toFixed(1);
+const pct=v=>Math.round(v*100);
+function keyName(c){const m={ArrowUp:'↑',ArrowDown:'↓',ArrowLeft:'←',ArrowRight:'→',Space:'Space',ShiftLeft:'L-Shift',ShiftRight:'R-Shift',ControlLeft:'L-Ctrl',ControlRight:'R-Ctrl'};
+  return m[c]||c.replace(/^Key/,'').replace(/^Digit/,'').replace(/^Numpad/,'Num ');}
+const today=()=>new Date().toISOString().slice(0,10);
+
+/* ============================== content ============================== */
+const LESSONS=[
+{t:'1. What alternating is (and why it works)',b:`<p>In Geometry Dash, <b>alternating</b> means clicking with two fingers in turn (or two keys/buttons) instead of tapping with one finger. One finger tops out around 6–8 CPS for most people; two fingers taking turns can reach 10–14+ CPS because each finger only has to tap half as often.</p>
+<p>The goal isn't just speed. Spam sections in GD (wave spam, ship/UFO/cube spam) punish <em>uneven</em> clicks. A steady 8 CPS beats a shaky 11 CPS. This tool trains <b>consistency first, speed second</b>.</p>`},
+{t:'2. Setup: fingers, keys, posture',b:`<ul>
+<li><b>Keyboard:</b> pick two keys your fingers reach without moving your hand (index + middle on two neighbouring keys is common). Set them in Settings. The trainer defaults to <span class="kbd">F</span> and <span class="kbd">J</span> so you can practise one finger per hand first.</li>
+<li><b>Same key, two fingers:</b> many players alternate index/middle on <em>one</em> key or on a mouse button. To train that, bind both trainer keys to neighbouring keys, then move to the real game once it feels natural.</li>
+<li><b>Mouse:</b> index + middle on left click is the classic "mouse alternate." Use the on-screen L/R pads with two fingers on a touch screen to practise the rhythm.</li>
+<li><b>Posture:</b> forearm supported, wrist neutral and relaxed, fingers hovering just above the keys. Tension is the enemy of speed.</li>
+</ul>`},
+{t:'3. Finger mechanics',b:`<ul>
+<li>Use <b>small, fast motions</b> from the knuckle, not the whole arm.</li>
+<li>Think "<b>down-up-down-up</b>": one finger rises as the other falls, like a see-saw.</li>
+<li>Keep the fingers light. Don't slam keys; bottoming out wastes time.</li>
+<li>Fingers should never hit the same key twice in a row. The trainer counts these as <b>double-hits</b>.</li>
+<li>If one finger is clearly weaker (see the L/R balance in your analysis), spend extra drills on slow, exact taps with that finger leading.</li>
+</ul>`},
+{t:'4. Rhythm before speed',b:`<p>Your brain needs to learn <em>even spacing</em>. Start with the <b>Metronome Lock</b> drill at a comfortable 3 CPS. Each beat is one tap, and the hands alternate. Aim to land <em>on</em> the click, not after it.</p>
+<ul><li>If your average error is negative you're rushing; positive means you're dragging.</li>
+<li>Only raise the tempo when you hit ≥85% of beats on time at the current tempo.</li></ul>`},
+{t:'5. Building speed safely',b:`<p>Use the <b>ladder method</b>: find the tempo where you can stay ≥85% on-beat. Practise there for a few rounds, then go +0.5 CPS. If accuracy collapses, drop back half a step and repeat. Short bursts (<em>Sprint</em> drill) teach your hands what fast feels like; metronome and endurance drills make it reliable.</p>
+<p>Never train through pain, numbness or tingling. Stop, shake out your hands, and rest.</p>`},
+{t:'6. Endurance and relaxation',b:`<p>Real spam sections last 5–20 seconds. The <b>drift</b> number in your analysis compares the first and second half of a run: a big positive number means you slow down (tensing up), a big negative one means you panic-speed. Keep shoulders down, breathe, and stay loose.</p>`},
+{t:'7. Taking it into Geometry Dash',b:`<ul>
+<li>Practise in-game with <b>Practice Mode</b> on a spam section at reduced speed (or a custom level with a slow wave) before full speed.</li>
+<li>In the wave, clicks are in/out of hold. A steady tempo keeps the wave flat. The <b>Wave Control</b> drill simulates this: each tap flips direction, so even rhythm keeps you centred in a shrinking corridor.</li>
+<li>Match the click speed to the segment. Often you need less than your max; consistency at 70% of your top CPS is ideal.</li>
+<li>Game timing runs on physics ticks, so <em>evenly spaced</em> clicks matter more than peak speed.</li>
+<li>Warm up with 2–3 minutes of the daily session before attempting hard spam sections.</li>
+</ul>`},
+{t:'8. Troubleshooting',b:`<ul>
+<li><b>One finger dominates / double hits:</b> slow down to half speed and exaggerate the see-saw motion.</li>
+<li><b>Speeds up then chokes:</b> you're tensing. Lower the tempo and aim for long, relaxed runs.</li>
+<li><b>Uneven intervals (high variation):</b> use the metronome more, and less free-tapping.</li>
+<li><b>Fingers colliding or sliding:</b> move the keys a bit apart or adjust hand angle.</li>
+<li><b>Plateau:</b> train at 80% of max for accuracy one day, sprints the next.</li>
+</ul>`},
+{t:'9. A simple practice plan',b:`<ol><li>Do the <b>Daily Session</b> (Practice tab), about 5 minutes.</li>
+<li>Work the current level on the Path until you pass it the required number of times <em>in a row</em>.</li>
+<li>Check Analysis weekly: is your rating, consistency and L/R balance improving?</li>
+<li>Take rest days. Short daily practice beats long occasional grinds.</li></ol>`}
+];
+
+const LEVELS=[
+ {id:'basics',name:'Two-Finger Basics',focus:'Alternate cleanly: no double-hits.',need:2,lesson:2,
+  drill:{type:'free',name:'Basics: 8s free alternate',dur:8},pass:{cps:3,alt:0.9}},
+ {id:'beat',name:'Find the Beat',focus:'Land taps on a slow metronome.',need:2,lesson:3,
+  drill:{type:'metro',name:'Find the Beat (3 CPS)',cps:3,beats:24},pass:{hit:0.8,mae:60}},
+ {id:'smooth',name:'Smooth Speed',focus:'Reach 5 CPS with even spacing.',need:3,lesson:4,
+  drill:{type:'free',name:'Smooth Speed: 10s',dur:10},pass:{cps:5,cv:0.3,alt:0.92}},
+ {id:'lock',name:'Metronome Lock',focus:'Stay locked to the beat at 5 CPS.',need:3,lesson:3,
+  drill:{type:'metro',name:'Metronome Lock (5 CPS)',cps:5,beats:32},pass:{hit:0.85,mae:45}},
+ {id:'endure',name:'Endurance',focus:'Hold 6 CPS for 15s without fading.',need:3,lesson:5,
+  drill:{type:'free',name:'Endurance: 15s',dur:15},pass:{cps:6,cv:0.25,drift:0.15}},
+ {id:'wave',name:'Wave Control',focus:'Survive the shrinking wave corridor.',need:3,lesson:6,
+  drill:{type:'wave',name:'Wave Control: 20s',dur:20},pass:{survive:20}},
+ {id:'ready',name:'GD Ready',focus:'7+ CPS, steady and clean, for 12s.',need:3,lesson:6,
+  drill:{type:'free',name:'GD Ready: 12s',dur:12},pass:{cps:7,cv:0.22,alt:0.95}}
+];
+function levelState(id){return S.prog[id]||(S.prog[id]={streak:0,done:false});}
+function currentLevel(){for(let i=0;i<LEVELS.length;i++)if(!levelState(LEVELS[i].id).done)return i;return LEVELS.length;}
+
+/* ============================== analysis ============================== */
+function analyze(taps){
+  const n=taps.length,r={n,cps:0,cv:1,alt:0,dbl:0,dur:0,ints:[],hands:taps.map(t=>t.h),drift:0,lMean:0,rMean:0,mean:0,sd:0};
+  if(n<3)return r;
+  let altOk=0,ints=[];
+  for(let i=1;i<n;i++){ints.push(taps[i].t-taps[i-1].t);if(taps[i].h!==taps[i-1].h)altOk++;else r.dbl++;}
+  r.ints=ints;r.dur=(taps[n-1].t-taps[0].t)/1000;
+  r.cps=r.dur>0?(n-1)/r.dur:0;
+  const mean=ints.reduce((a,b)=>a+b,0)/ints.length;
+  const sd=Math.sqrt(ints.reduce((a,b)=>a+(b-mean)**2,0)/ints.length);
+  r.mean=mean;r.sd=sd;r.cv=sd/mean;r.alt=altOk/ints.length;
+  const half=Math.floor(ints.length/2);
+  if(half>=2){const m1=avg(ints.slice(0,half)),m2=avg(ints.slice(half));r.drift=(m2-m1)/m1;}
+  const L=[],R=[];for(let i=1;i<n;i++)(taps[i].h===0?L:R).push(ints[i-1]);
+  r.lMean=L.length?avg(L):0;r.rMean=R.length?avg(R):0;
+  return r;
+}
+function avg(a){return a.length?a.reduce((x,y)=>x+y,0)/a.length:0;}
+function scoreOf(r){
+  if(r.n<5)return 0;
+  return clamp(r.cps/8,0,1)*35+clamp(1-(r.cv-0.08)/0.32,0,1)*40+clamp((r.alt-0.7)/0.3,0,1)*25;
+}
+function tierOf(s){return s<25?'Beginner':s<45?'Rookie':s<60?'Steady':s<75?'Skilled':s<88?'Advanced':'Master';}
+function rating(){
+  const xs=S.sessions.filter(s=>s.type!=='wave'&&s.score>0).slice(-15).map(s=>s.score).sort((a,b)=>b-a).slice(0,5);
+  return xs.length?avg(xs):0;
+}
+function insights(r,cfg){
+  const out=[];const add=(k,t)=>out.push({k,t});
+  if(r.n<5){add('warn','Too few taps to analyse. Try again and keep tapping for the whole drill.');return out;}
+  if(r.dbl>0&&r.alt<0.9)add('warn',`${r.dbl} double-hit${r.dbl>1?'s':''}: you tapped the same hand twice in a row (${pct(r.alt)}% alternation). Slow down and exaggerate the see-saw motion.`);
+  else if(r.alt>=0.97)add('good','Very clean alternation.');
+  if(r.lMean&&r.rMean){const d=(r.rMean-r.lMean)/((r.rMean+r.lMean)/2);
+    if(Math.abs(d)>0.08){const slow=d>0?'R':'L';add('warn',`Your ${slow} hand is about ${pct(Math.abs(d))}% slower. Drill slowly with the ${slow} hand leading and focus on matching its timing to the other.`);}
+    else add('good','Both hands are well balanced.');}
+  if(r.cv>0.3)add('warn',`Spacing is uneven (variation ${pct(r.cv)}%). Use the Metronome Lock drill at a comfortable speed to train rhythm.`);
+  else if(r.cv<=0.15)add('good',`Excellent consistency (${pct(r.cv)}% variation).`);
+  if(r.drift>0.12)add('warn',`You slowed down ~${pct(r.drift)}% through the run. Usually tension: relax the wrists and train longer runs at a lower tempo.`);
+  else if(r.drift<-0.12)add('warn',`You sped up ~${pct(-r.drift)}% through the run. Try to hold the start tempo; don't rush.`);
+  if(cfg.type==='metro'&&r.metro){
+    add(r.metro.hit>=0.85?'good':'warn',`You hit ${pct(r.metro.hit)}% of beats within half a beat, with ${Math.round(r.metro.mae)}ms average error.`);
+    if(Math.abs(r.metro.bias)>15)add('warn',r.metro.bias<0?`You tend to tap early by ~${Math.round(-r.metro.bias)}ms (rushing). Wait for the click.`:`You tend to tap late by ~${Math.round(r.metro.bias)}ms (dragging), or your audio latency is high. Adjust the offset in Settings.`);
+  }
+  if(cfg.type==='wave')add(r.survived>=cfg.dur?'good':'warn',r.survived>=cfg.dur?'You survived the whole corridor!':`You crashed after ${f1(r.survived)}s. A steady rhythm keeps the wave flat; uneven gaps make it drift off-centre.`);
+  return out;
+}
+
+/* ============================== audio ============================== */
+let AC=null;
+function ac(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return null;}}if(AC.state==='suspended')AC.resume();return AC;}
+function clickAt(perfT,accent){
+  const a=ac();if(!a)return;
+  const when=a.currentTime+Math.max(0,(perfT-performance.now())/1000);
+  const o=a.createOscillator(),g=a.createGain();
+  o.frequency.value=accent?1500:1000;o.type='sine';
+  g.gain.setValueAtTime(0,when);g.gain.linearRampToValueAtTime(S.vol,when+0.002);g.gain.exponentialRampToValueAtTime(0.0001,when+0.06);
+  o.connect(g);g.connect(a.destination);o.start(when);o.stop(when+0.08);
+}
+
+/* ============================== input ============================== */
+let tapHandler=null,rebind=null;
+document.addEventListener('keydown',e=>{
+  if(rebind){e.preventDefault();if(e.code!=='Escape'){const other=S.keys[1-rebind.i];
+      if(e.code===other){toast('Pick two different keys.');}else{S.keys[rebind.i]=e.code;save();}}
+    rebind=null;renderSettings();return;}
+  if(!tapHandler||e.repeat||e.ctrlKey||e.metaKey||e.altKey)return;
+  const i=S.keys.indexOf(e.code);if(i<0)return;
+  e.preventDefault();tapHandler(i,e.timeStamp||performance.now());
+});
+function bindPad(){
+  [['padL',0],['padR',1]].forEach(([id,h])=>{
+    const b=$('#'+id);
+    b.addEventListener('pointerdown',e=>{e.preventDefault();if(tapHandler)tapHandler(h,e.timeStamp||performance.now());});
+    b.addEventListener('contextmenu',e=>e.preventDefault());
+    b.addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='Enter')e.preventDefault();});
+  });
+}
+function flash(h,bad){
+  const b=$(h===0?'#padL':'#padR');b.classList.add('hit');if(bad)b.classList.add('bad');
+  setTimeout(()=>b.classList.remove('hit','bad'),70);
+}
+let toastT;function toast(m){const el=$('#msg');el.textContent=m;clearTimeout(toastT);toastT=setTimeout(()=>{if(el.textContent===m)el.textContent='';},2500);}
+
+/* ============================== drill engine ============================== */
+let D=null,raf=0;
+const stage=$('#stage');const sctx=stage.getContext('2d');
+function fitCanvas(c,h){const dpr=window.devicePixelRatio||1;const w=c.clientWidth;
+  if(c.width!==Math.round(w*dpr)||c.height!==Math.round(h*dpr)){c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);c.style.height=h+'px';}
+  const x=c.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);return {x,w,h};}
+
+function openDrill(cfg,onDone){
+  closeTools();
+  D={cfg,onDone,state:'ready',taps:[],scored:[],dbl:0,t0:0,last:-1,data:{}};
+  $('#dName').textContent=cfg.name;
+  $('#kL').textContent=keyName(S.keys[0]);$('#kR').textContent=keyName(S.keys[1]);
+  $('#result').classList.remove('on');$('#result').innerHTML='';
+  $('#pad').style.display='';$('#dStop').style.display=(cfg.dur===0&&!cfg.taps)?'':'none';
+  ['hTime','hTaps','hCps','hDbl'].forEach(i=>$('#'+i).textContent=i==='hTime'?'0.0':'0');
+  $('#drill').classList.add('on');document.body.style.overflow='hidden';
+  if(cfg.type==='metro'){
+    const go=document.createElement('button');go.className='primary';go.textContent='Start metronome';go.id='goBtn';
+    $('#msg').innerHTML='';$('#msg').append('Put your fingers on the keys, then ');$('#msg').append(go);
+    go.onclick=()=>{go.remove();startMetro();};
+    tapHandler=(h,t)=>{flash(h);};
+  }else{
+    $('#msg').textContent=cfg.type==='wave'?'Tap either key to start. Every tap flips the wave direction. Keep it in the corridor!':
+      cfg.taps?`Tap ${cfg.taps} times as fast as you can, alternating. Timer starts on your first tap.`:'Alternate as evenly as you can. Timer starts on your first tap.';
+    tapHandler=onTap;
+  }
+  cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);
+}
+function closeDrill(){
+  cancelAnimationFrame(raf);tapHandler=null;D=null;stopMetroTool();
+  $('#drill').classList.remove('on');document.body.style.overflow='';
+}
+$('#dQuit').onclick=()=>{const cb=D&&D.onQuit;closeDrill();if(cb)cb();renderAll();};
+$('#dStop').onclick=()=>{if(D&&D.state==='run')finish();};
+
+function startMetro(){
+  ac();const iv=1000/D.cfg.cps,lead=4,total=lead+D.cfg.beats;
+  const start=performance.now()+900;
+  D.iv=iv;D.lead=lead;D.beats=[];
+  for(let i=0;i<total;i++){const t=start+i*iv;D.beats.push(t);clickAt(t,i%2===0);}
+  D.state='run';D.t0=start;D.data.hits=new Map();D.data.extra=0;D.data.marks=[];
+  $('#msg').textContent='Count-in: 4 clicks, then tap on every click. Alternate hands.';
+  tapHandler=onTap;
+}
+function onTap(h,t){
+  if(!D||D.state==='done')return;
+  const cfg=D.cfg;
+  if(cfg.type==='metro'){
+    if(D.state!=='run')return;
+    if(t<D.beats[D.lead]-D.iv*0.6)return;       // during count-in
+  }
+  if(D.state==='ready'){D.state='run';D.t0=t;$('#msg').textContent='';if(cfg.type==='wave')waveInit();}
+  const prev=D.taps[D.taps.length-1];
+  const bad=prev&&prev.h===h;
+  if(bad)D.dbl++;
+  flash(h,bad);
+  D.taps.push({t,h});
+  if(cfg.type==='metro'){
+    const adj=t-S.offset;
+    const k=Math.round((adj-D.beats[0])/D.iv);
+    if(k>=D.lead&&k<D.beats.length){
+      const err=adj-D.beats[k];
+      if(Math.abs(err)<D.iv*0.5){
+        const old=D.data.hits.get(k);
+        if(old===undefined||Math.abs(err)<Math.abs(old))D.data.hits.set(k,err);
+        if(old!==undefined)D.data.extra++;
+        D.data.marks.push({k,err,h});
+      }else D.data.extra++;
+    }
+  }
+  if(cfg.type==='wave'&&D.data.alive)D.data.dir*=-1;
+  if(cfg.taps&&D.taps.length>=cfg.taps)finish();
+}
+function liveCps(now){const w=2000,ts=D.taps.filter(x=>x.t>now-w);if(ts.length<2)return 0;return (ts.length-1)/((ts[ts.length-1].t-ts[0].t)/1000);}
+
+function loop(){
+  if(!D)return;const now=performance.now(),cfg=D.cfg;
+  if(D.state==='run'){
+    const el=(now-D.t0)/1000;
+    if(cfg.type==='metro'){const endT=D.beats[D.beats.length-1]+D.iv*0.6;
+      $('#hTime').textContent=f1(Math.max(0,(endT-now)/1000));if(now>endT)finish();}
+    else if(cfg.type==='wave'){waveStep(now);$('#hTime').textContent=f1(D.data.t);}
+    else if(cfg.dur){$('#hTime').textContent=f1(Math.max(0,cfg.dur-el));if(el>=cfg.dur)finish();}
+    else $('#hTime').textContent=f1(el);
+    if(D&&D.state==='run'){
+      $('#hTaps').textContent=D.taps.length;$('#hCps').textContent=f1(liveCps(now));$('#hDbl').textContent=D.dbl;
+    }
+  }
+  if(D&&D.state!=='done')drawStage(now);
+  if(D)raf=requestAnimationFrame(loop);
+}
+
+/* ---- drawing ---- */
+function drawStage(now){
+  const {x,w,h}=fitCanvas(stage,200);x.clearRect(0,0,w,h);
+  const cfg=D.cfg;
+  if(cfg.type==='metro'&&D.beats)drawMetro(x,w,h,now);
+  else if(cfg.type==='wave')drawWave(x,w,h);
+  else drawBars(x,w,h);
+}
+function drawBars(x,w,h){
+  const ints=[];for(let i=1;i<D.taps.length;i++)ints.push({v:D.taps[i].t-D.taps[i-1].t,h:D.taps[i].h});
+  const show=ints.slice(-50);
+  x.fillStyle='#5f6b82';x.font='12px system-ui';x.fillText('Gap between taps (shorter bar = faster; aim for equal heights)',8,14);
+  if(!show.length){x.fillText('Waiting for taps…',8,h/2);return;}
+  const max=300,bw=w/50;
+  show.forEach((it,i)=>{const bh=clamp(it.v/max,0,1)*(h-30);x.fillStyle=it.h===0?'#2563eb':'#d97706';x.fillRect(i*bw+1,h-bh,bw-2,bh);});
+  const m=avg(show.map(s=>s.v));x.strokeStyle='#00000044';x.setLineDash([4,4]);x.beginPath();const my=h-clamp(m/max,0,1)*(h-30);x.moveTo(0,my);x.lineTo(w,my);x.stroke();x.setLineDash([]);
+  x.fillStyle='#1b2233';x.fillText(Math.round(m)+'ms avg',w-80,my-4);
+}
+function drawMetro(x,w,h,now){
+  const hitX=w*0.25,pxms=0.32;
+  x.strokeStyle='#00000044';x.beginPath();x.moveTo(hitX,10);x.lineTo(hitX,h-10);x.stroke();
+  x.font='bold 13px system-ui';x.textAlign='center';
+  D.beats.forEach((bt,i)=>{
+    const bx=hitX+(bt-now)*pxms;if(bx<-20||bx>w+20)return;
+    const lead=i<D.lead;
+    x.globalAlpha=lead?0.45:1;x.fillStyle=i%2===0?'#2563eb':'#d97706';
+    x.beginPath();x.arc(bx,h/2,16,0,7);x.fill();x.fillStyle='#ffffff';x.fillText(i%2===0?'L':'R',bx,h/2+5);
+    x.globalAlpha=1;
+  });
+  D.data.marks.slice(-30).forEach(m=>{
+    const bx=hitX+(D.beats[m.k]-now)*pxms+m.err*pxms;if(bx<-20||bx>w+20)return;
+    const good=Math.abs(m.err)<50;x.fillStyle=good?'#16a34a':Math.abs(m.err)<100?'#d97706':'#dc2626';
+    x.fillRect(bx-2,h/2-34,4,68);
+  });
+  x.textAlign='left';x.fillStyle='#5f6b82';x.font='12px system-ui';
+  x.fillText('Tap when each circle reaches the line. Green bar = on time. Left of a circle = early.',8,14);
+}
+const WV={x:110,speed:170,scroll:220,H:200};
+function waveInit(){D.data={alive:true,y:0,dir:-1,t:0,last:performance.now(),started:true};D.data.y=corr(0).c;}
+function corr(t){const c=WV.H/2+14*Math.sin(t*0.6)+6*Math.sin(t*1.4+1);const g=Math.max(50,120-t*3.5);return {c,g};}
+function waveStep(now){
+  const d=D.data;if(!d.alive)return;
+  const dt=Math.min(0.05,(now-d.last)/1000);d.last=now;d.t+=dt;
+  d.y+=d.dir*WV.speed*dt;
+  const c=corr(d.t);
+  if(Math.abs(d.y-c.c)>c.g/2){d.alive=false;d.crashT=d.t;setTimeout(()=>{if(D&&D.state==='run')finish();},500);}
+  else if(d.t>=D.cfg.dur){d.alive=false;d.won=true;finish();}
+}
+function drawWave(x,w,h){
+  const d=D.data;const t=d.started?d.t:0;
+  x.fillStyle='#e6eefb';x.fillRect(0,0,w,h);
+  x.fillStyle='#1e293b';
+  for(let px=0;px<w;px+=3){const tt=t+(px-WV.x)/WV.scroll;if(tt<0){x.fillRect(px,0,3,h);continue;}
+    const c=corr(tt);x.fillRect(px,0,3,c.c-c.g/2);x.fillRect(px,c.c+c.g/2,3,h);}
+  x.strokeStyle='#64748b';x.lineWidth=2;x.beginPath();
+  for(let px=0;px<w;px+=3){const tt=t+(px-WV.x)/WV.scroll;if(tt<0)continue;const c=corr(tt);px===0?x.moveTo(px,c.c-c.g/2):x.lineTo(px,c.c-c.g/2);}x.stroke();
+  x.beginPath();for(let px=0;px<w;px+=3){const tt=t+(px-WV.x)/WV.scroll;if(tt<0)continue;const c=corr(tt);px===0?x.moveTo(px,c.c+c.g/2):x.lineTo(px,c.c+c.g/2);}x.stroke();
+  const y=d.started?d.y:corr(0).c;
+  x.fillStyle=d.alive===false&&!d.won?'#dc2626':'#2563eb';
+  x.beginPath();x.moveTo(WV.x-10,y+(d.dir||-1)*8);x.lineTo(WV.x+8,y);x.lineTo(WV.x-10,y-(d.dir||-1)*8);x.closePath();x.fill();
+  x.fillStyle='#cbd5e1';x.font='12px system-ui';x.fillText('Each tap flips the wave up/down. Steady rhythm = flat line.',8,14);
+}
+
+/* ---- finish & results ---- */
+function finish(){
+  if(!D||D.state==='done')return;
+  D.state='done';const cfg=D.cfg;tapHandler=null;
+  let taps=D.taps;
+  if(cfg.type==='metro')taps=taps.filter(t=>t.t>=D.beats[D.lead]-D.iv*0.6);
+  const r=analyze(taps);
+  if(cfg.type==='metro'){
+    const errs=[...D.data.hits.values()];
+    r.metro={hit:errs.length/cfg.beats,mae:avg(errs.map(Math.abs)),bias:avg(errs),extra:D.data.extra};
+  }
+  if(cfg.type==='wave'){r.survived=D.data.won?cfg.dur:(D.data.crashT||D.data.t||0);}
+  r.score=cfg.type==='wave'?0:scoreOf(r);
+  // level evaluation
+  let ev=null;
+  if(cfg.level){const L=LEVELS.find(l=>l.id===cfg.level);ev=evalLevel(L,r);}
+  // persist
+  S.sessions.push({d:Date.now(),type:cfg.type,name:cfg.name,cps:+r.cps.toFixed(2),cv:+r.cv.toFixed(3),alt:+r.alt.toFixed(3),
+    dbl:r.dbl,drift:+r.drift.toFixed(3),score:Math.round(r.score),hit:r.metro?+r.metro.hit.toFixed(2):undefined,
+    mae:r.metro?Math.round(r.metro.mae):undefined,surv:r.survived!==undefined?+r.survived.toFixed(1):undefined,n:r.n});
+  if(S.sessions.length>300)S.sessions=S.sessions.slice(-300);
+  if(r.n>=5&&r.alt>=0.85&&r.cps>S.best&&cfg.type!=='wave')S.best=r.cps;
+  if(!S.days.includes(today()))S.days.push(today());
+  let levelMsg='';
+  if(ev){
+    const st=levelState(cfg.level),L=LEVELS.find(l=>l.id===cfg.level);
+    if(st.done){levelMsg='<div class="insight good">Level already complete. This was a practice run.</div>';}
+    else if(ev.pass){st.streak++;
+      if(st.streak>=L.need){st.done=true;levelMsg=`<div class="insight good"><b>Level complete!</b> You passed ${L.need} in a row.</div>`;}
+      else levelMsg=`<div class="insight good">Passed! ${st.streak}/${L.need} in a row needed. Do it again to prove consistency.</div>`;}
+    else{st.streak=0;levelMsg='<div class="insight warn">Not quite. Consistency counts, so your in-a-row streak reset. Check the tips below and retry.</div>';}
+  }
+  save();
+  showResult(r,cfg,ev,levelMsg);
+  if(D&&D.onDone)D.onDone(r);
+}
+function evalLevel(L,r){
+  const p=L.pass,c=[];
+  if(p.cps!==undefined)c.push({t:`Speed ≥ ${p.cps} CPS`,v:f1(r.cps),ok:r.cps>=p.cps});
+  if(p.cv!==undefined)c.push({t:`Variation ≤ ${pct(p.cv)}%`,v:pct(r.cv)+'%',ok:r.cv<=p.cv});
+  if(p.alt!==undefined)c.push({t:`Alternation ≥ ${pct(p.alt)}%`,v:pct(r.alt)+'%',ok:r.alt>=p.alt});
+  if(p.drift!==undefined)c.push({t:`Drift within ±${pct(p.drift)}%`,v:(r.drift>=0?'+':'')+pct(r.drift)+'%',ok:Math.abs(r.drift)<=p.drift});
+  if(p.hit!==undefined&&r.metro)c.push({t:`On-beat ≥ ${pct(p.hit)}%`,v:pct(r.metro.hit)+'%',ok:r.metro.hit>=p.hit});
+  if(p.mae!==undefined&&r.metro)c.push({t:`Avg timing error ≤ ${p.mae}ms`,v:Math.round(r.metro.mae)+'ms',ok:r.metro.mae<=p.mae});
+  if(p.survive!==undefined)c.push({t:`Survive ${p.survive}s`,v:f1(r.survived||0)+'s',ok:(r.survived||0)>=p.survive});
+  return {checks:c,pass:c.length>0&&c.every(x=>x.ok)};
+}
+function showResult(r,cfg,ev,levelMsg){
+  const R=$('#result');
+  const stat=(l,v)=>`<div class="stat"><span class="mute small">${l}</span><b>${v}</b></div>`;
+  let h=`<h3>Results</h3><div class="stats">`;
+  h+=stat('Speed',f1(r.cps)+' CPS')+stat('Taps',r.n)+stat('Variation',pct(r.cv)+'%')+stat('Alternation',pct(r.alt)+'%');
+  if(r.metro)h+=stat('On-beat',pct(r.metro.hit)+'%')+stat('Timing error',Math.round(r.metro.mae)+'ms');
+  if(r.survived!==undefined)h+=stat('Survived',f1(r.survived)+'s');
+  if(cfg.type!=='wave')h+=stat('Score',Math.round(r.score)+'/100');
+  h+=stat('Drift',(r.drift>=0?'+':'')+pct(r.drift)+'%');
+  h+='</div>';
+  if(ev){h+='<h3 style="margin-top:14px">Level test</h3><table>'+ev.checks.map(c=>`<tr><td>${c.t}</td><td>${c.v}</td><td class="${c.ok?'ok':'no'}">${c.ok?'✔':'✘'}</td></tr>`).join('')+'</table>'+levelMsg;}
+  h+='<h3 style="margin-top:14px">Analysis</h3>'+insights(r,cfg).map(i=>`<div class="insight ${i.k}">${i.t}</div>`).join('');
+  h+='<h3 style="margin-top:14px">Your rhythm</h3><canvas id="rc" height="160"></canvas>';
+  h+='<div class="row" style="margin-top:14px"><button class="primary" id="rRetry">Retry</button>';
+  if(D&&D.queue&&D.queue.length)h+='<button class="primary" id="rNext">Next drill ▶</button>';
+  h+='<button id="rClose">Close</button></div>';
+  R.innerHTML=h;R.classList.add('on');
+  $('#pad').style.display='none';$('#dStop').style.display='none';$('#msg').textContent='';
+  requestAnimationFrame(()=>drawRhythm(r));
+  const cfg0=D.cfg,onDone=D.onDone,queue=D.queue,onQuit=D.onQuit;
+  $('#rRetry').onclick=()=>{openDrill(cfg0,onDone);D.queue=queue;D.onQuit=onQuit;};
+  if($('#rNext'))$('#rNext').onclick=()=>{runQueue(queue);};
+  $('#rClose').onclick=()=>{closeDrill();renderAll();};
+  R.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function drawRhythm(r){
+  const c=$('#rc');if(!c)return;const {x,w,h}=fitCanvas(c,160);x.clearRect(0,0,w,h);
+  if(!r.ints.length){x.fillStyle='#5f6b82';x.fillText('No data',8,20);return;}
+  const max=Math.max(300,...r.ints.map(v=>Math.min(v,600)));
+  const px=i=>8+(w-16)*i/Math.max(1,r.ints.length-1),py=v=>h-8-(h-20)*clamp(v/max,0,1);
+  x.strokeStyle='#00000033';x.setLineDash([4,4]);x.beginPath();x.moveTo(0,py(r.mean));x.lineTo(w,py(r.mean));x.stroke();x.setLineDash([]);
+  x.strokeStyle='#94a3b8';x.beginPath();r.ints.forEach((v,i)=>i?x.lineTo(px(i),py(v)):x.moveTo(px(i),py(v)));x.stroke();
+  r.ints.forEach((v,i)=>{x.fillStyle=r.hands[i+1]===0?'#2563eb':'#d97706';x.beginPath();x.arc(px(i),py(v),3,0,7);x.fill();});
+  x.fillStyle='#5f6b82';x.font='11px system-ui';x.fillText(`gap (ms): ${Math.round(r.mean)} avg · ${Math.round(r.sd)} spread · blue=L orange=R`,8,12);
+}
+
+/* ---- queue / daily session ---- */
+function runQueue(q){
+  if(!q||!q.length){closeDrill();renderAll();return;}
+  const rest=q.slice(),cfg=rest.shift();
+  openDrill(cfg,null);D.queue=rest;
+}
+function dailyQueue(){
+  const best=S.best||4,m=clamp(Math.round(best*0.7),3,8);
+  return [
+    {type:'free',name:'Warm-up: 8s easy alternate',dur:8},
+    {type:'metro',name:`Metronome ${m} CPS`,cps:m,beats:24},
+    {type:'free',dur:0,taps:20,name:'Sprint: 20 taps fast'},
+    {type:'free',name:'Endurance: 12s',dur:12},
+    {type:'wave',name:'Wave Control: 15s',dur:15}
+  ];
+}
+
+/* ============================== tools ============================== */
+let metroTimer=null,metroNext=0,metroVis=null;
+function stopMetroTool(){clearInterval(metroTimer);metroTimer=null;}
+function closeTools(){stopMetroTool();}
+function toolMetro(on){
+  const btn=$('#tmBtn');
+  if(!on){stopMetroTool();if(btn)btn.textContent='Start';return;}
+  ac();const cps=+$('#tmCps').value;let i=0;metroNext=performance.now()+100;
+  btn.textContent='Stop';
+  metroTimer=setInterval(()=>{
+    const iv=1000/(+$('#tmCps').value||cps);
+    while(metroNext<performance.now()+120){
+      clickAt(metroNext,i%2===0);const hh=i%2,delay=Math.max(0,metroNext-performance.now());
+      setTimeout(()=>{const el=$(hh===0?'#tmL':'#tmR');if(!el)return;el.style.opacity=1;setTimeout(()=>el.style.opacity=.2,90);},delay);
+      i++;metroNext+=iv;}
+  },25);
+}
+
+/* ============================== views ============================== */
+const TABS=[['path','Path'],['learn','Learn'],['practice','Practice'],['tools','Tools'],['stats','Analysis'],['settings','Settings']];
+let tab='path';
+function renderNav(){
+  $('#nav').innerHTML=TABS.map(([k,n])=>`<button data-t="${k}" class="${k===tab?'on':''}">${n}</button>`).join('');
+  $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>go(b.dataset.t));
+}
+function go(t,extra){
+  if(tab==='tools')closeTools();
+  tab=t;renderNav();document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+t));
+  ({path:renderPath,learn:renderLearn,practice:renderPractice,tools:renderTools,stats:renderStats,settings:renderSettings})[t](extra);
+  window.scrollTo(0,0);
+}
+function renderAll(){go(tab);}
+
+function renderPath(){
+  const cur=currentLevel(),r=rating();
+  let h=`<div class="card"><h2>Your path to consistent alternating</h2>
+  <p class="mute">Pass each level's test <b>several times in a row</b> to unlock the next. That's how you know the skill is reliable, not a lucky run. Read the lesson first, then take the test.</p>
+  <div class="stats">
+   <div class="stat"><span class="mute small">Rating</span><b>${Math.round(r)} <span class="small mute">${tierOf(r)}</span></b></div>
+   <div class="stat"><span class="mute small">Best clean CPS</span><b>${f1(S.best)}</b></div>
+   <div class="stat"><span class="mute small">Level</span><b>${Math.min(cur+1,LEVELS.length)}/${LEVELS.length}</b></div>
+   <div class="stat"><span class="mute small">Day streak</span><b>${dayStreak()}</b></div>
+  </div>
+  <div class="row" style="margin-top:12px"><button class="primary" id="pDaily">▶ Start daily session</button><span class="mute small">~5 min warm-up tailored to you</span></div></div>`;
+  if(cur>=LEVELS.length)h+='<div class="card"><h3>🏆 Path complete!</h3><p>You can alternate consistently. Keep your edge with the daily session, and try raising the tempos in Practice.</p></div>';
+  h+='<div class="grid">';
+  LEVELS.forEach((L,i)=>{
+    const st=levelState(L.id),locked=i>cur;
+    h+=`<div class="card lvl ${locked?'locked':''} ${i===cur?'current':''}">
+      <div class="row"><b>${i+1}. ${L.name}</b><span class="space"></span>${st.done?'<span class="tag good">complete</span>':locked?'<span class="tag lock">locked</span>':'<span class="tag">current</span>'}</div>
+      <p class="mute small" style="margin:6px 0">${L.focus}</p>
+      <div class="small mute">Pass ${L.need} in a row</div>
+      <div class="pips" style="margin:6px 0 10px">${Array.from({length:L.need},(_, k)=>`<span class="pip ${st.done||k<st.streak?'on':''}"></span>`).join('')}</div>
+      <div class="row"><button class="primary" data-start="${i}" ${locked?'disabled':''}>${st.done?'Retake test':'Take test'}</button><button class="ghost" data-lesson="${L.lesson}">Lesson</button></div></div>`;
+  });
+  h+='</div>';
+  $('#view-path').innerHTML=h;
+  $('#pDaily').onclick=()=>runQueue(dailyQueue());
+  $('#view-path').querySelectorAll('[data-start]').forEach(b=>b.onclick=()=>{const L=LEVELS[+b.dataset.start];openDrill(Object.assign({level:L.id},L.drill),null);});
+  $('#view-path').querySelectorAll('[data-lesson]').forEach(b=>b.onclick=()=>go('learn',+b.dataset.lesson));
+}
+function dayStreak(){
+  let n=0;const d=new Date();
+  for(;;){const s=d.toISOString().slice(0,10);if(S.days.includes(s)){n++;d.setDate(d.getDate()-1);}else if(n===0&&s===today()){d.setDate(d.getDate()-1);}else break;}
+  return n;
+}
+function renderLearn(open){
+  $('#view-learn').innerHTML='<div class="card"><h2>Lessons</h2><p class="mute">Short, practical guides. Read one, then try the matching drill.</p></div>'+
+   LESSONS.map((l,i)=>`<details ${i===open?'open':''} id="les${i}"><summary>${l.t}</summary>${l.b}</details>`).join('');
+  if(open!==undefined){const el=$('#les'+open);if(el)el.scrollIntoView();}
+}
+function renderPractice(){
+  const opts=(a,sel)=>a.map(v=>`<option ${v===sel?'selected':''}>${v}</option>`).join('');
+  $('#view-practice').innerHTML=`
+  <div class="card"><h2>Daily session</h2><p class="mute">Five drills, about five minutes, tuned to your current best speed.</p><button class="primary" id="prDaily">▶ Start daily session</button></div>
+  <div class="grid">
+   <div class="card"><h3>Free alternate</h3><p class="mute small">Tap as evenly as you can for a set time. Measures speed, consistency and drift.</p>
+     <div class="row"><label>Seconds <select id="fDur">${opts([5,8,10,15,20,30],10)}</select></label><button class="primary" id="fGo">Start</button></div></div>
+   <div class="card"><h3>Sprint</h3><p class="mute small">A fixed number of taps, as fast as possible. Teaches your hands what speed feels like.</p>
+     <div class="row"><label>Taps <select id="sTaps">${opts([10,20,30,50],20)}</select></label><button class="primary" id="sGo">Start</button></div></div>
+   <div class="card"><h3>Metronome lock</h3><p class="mute small">Tap on every click. Scores timing error and rushing/dragging.</p>
+     <div class="row"><label>CPS <input id="mCps" type="number" min="2" max="12" step="0.5" value="4" style="width:70px"></label><label>Beats <select id="mBeats">${opts([16,24,32,48],32)}</select></label><button class="primary" id="mGo">Start</button></div></div>
+   <div class="card"><h3>Wave control</h3><p class="mute small">Simulated wave: each tap flips direction. Stay in the shrinking corridor.</p>
+     <div class="row"><label>Seconds <select id="wDur">${opts([10,15,20,30],20)}</select></label><button class="primary" id="wGo">Start</button></div></div>
+  </div>`;
+  $('#prDaily').onclick=()=>runQueue(dailyQueue());
+  $('#fGo').onclick=()=>{const d=+$('#fDur').value;openDrill({type:'free',name:`Free alternate ${d}s`,dur:d});};
+  $('#sGo').onclick=()=>{const n=+$('#sTaps').value;openDrill({type:'free',dur:0,taps:n,name:`Sprint ${n} taps`});};
+  $('#mGo').onclick=()=>{const c=clamp(+$('#mCps').value||4,2,12),b=+$('#mBeats').value;openDrill({type:'metro',name:`Metronome ${c} CPS`,cps:c,beats:b});};
+  $('#wGo').onclick=()=>{const d=+$('#wDur').value;openDrill({type:'wave',name:`Wave control ${d}s`,dur:d});};
+}
+function renderTools(){
+  $('#view-tools').innerHTML=`
+  <div class="card"><h3>CPS tester</h3><p class="mute small">Open-ended tapping. Stop whenever you like to get your full analysis.</p>
+    <button class="primary" id="tCps">Open tester</button></div>
+  <div class="card"><h3>Metronome</h3>
+    <div class="row"><label style="flex:1">Speed: <b id="tmLbl">4.0</b> CPS<input id="tmCps" type="range" min="1" max="14" step="0.5" value="4"></label><button class="primary" id="tmBtn">Start</button></div>
+    <div class="row" style="margin-top:10px;justify-content:center"><div id="tmL" style="width:60px;height:60px;border-radius:50%;background:var(--L);opacity:.2"></div><div id="tmR" style="width:60px;height:60px;border-radius:50%;background:var(--R);opacity:.2"></div></div>
+    <p class="mute small">Circles alternate L/R so you can shadow-tap on a desk while listening.</p></div>
+  <div class="card"><h3>Converter</h3>
+    <div class="row"><label>CPS <input id="cvCps" type="number" step="0.1" value="8" style="width:90px"></label><label>Gap (ms) <input id="cvMs" type="number" step="1" value="125" style="width:90px"></label></div>
+    <div id="cvOut" class="small mute" style="margin-top:8px"></div></div>
+  <div class="card"><h3>Hand shadow drill (no screen needed)</h3>
+    <p class="mute small">Away from the keyboard? Rest your fingers on a desk and alternate silently for 20s, then rest 20s. Do this 5 times. Focus on small, relaxed motions and equal timing. Great for building stamina without strain.</p></div>`;
+  $('#tCps').onclick=()=>openDrill({type:'free',dur:0,name:'CPS tester'});
+  $('#tmCps').oninput=()=>$('#tmLbl').textContent=f1(+$('#tmCps').value);
+  $('#tmBtn').onclick=()=>toolMetro(!metroTimer);
+  const upd=(src)=>{let c=+$('#cvCps').value,m=+$('#cvMs').value;if(src==='ms'&&m>0){c=1000/m;$('#cvCps').value=f1(c);}else if(src==='cps'&&c>0){m=1000/c;$('#cvMs').value=Math.round(m);}
+    if(c>0)$('#cvOut').innerHTML=`Interval: <b>${Math.round(1000/c)}ms</b> · BPM (as 1/4 notes): <b>${Math.round(c*60)}</b> · Per-hand rate: <b>${f1(c/2)}</b> taps/s<br>Frames between clicks: ${f1(60/c)} @60fps · ${f1(144/c)} @144fps · ${f1(240/c)} @240 TPS`;};
+  $('#cvCps').oninput=()=>upd('cps');$('#cvMs').oninput=()=>upd('ms');upd('cps');
+}
+function spark(vals,color,min,max){
+  if(vals.length<2)return '<span class="mute small">Not enough data yet.</span>';
+  const W=300,H=60;min=min??Math.min(...vals);max=max??Math.max(...vals);if(max===min)max=min+1;
+  const pts=vals.map((v,i)=>`${(i/(vals.length-1)*W).toFixed(1)},${(H-4-(v-min)/(max-min)*(H-8)).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px"><polyline fill="none" stroke="${color}" stroke-width="2" points="${pts}"/></svg>`;
+}
+function renderStats(){
+  const ss=S.sessions.filter(s=>s.type!=='wave'&&s.n>=5),r=rating();
+  const last=ss.slice(-10);
+  let h=`<div class="card"><h2>Skill analysis</h2>
+   <div class="stats">
+    <div class="stat"><span class="mute small">Rating</span><b>${Math.round(r)}</b><span class="small mute">${tierOf(r)}</span></div>
+    <div class="stat"><span class="mute small">Best clean CPS</span><b>${f1(S.best)}</b></div>
+    <div class="stat"><span class="mute small">Sessions</span><b>${S.sessions.length}</b></div>
+    <div class="stat"><span class="mute small">Day streak</span><b>${dayStreak()}</b></div>
+   </div></div>`;
+  if(last.length){
+    const cps=avg(last.map(s=>s.cps)),cv=avg(last.map(s=>s.cv)),alt=avg(last.map(s=>s.alt)),dr=avg(last.map(s=>s.drift));
+    const tips=[];
+    if(alt<0.92)tips.push(['warn','Alternation is your weakest area. Do slow Basics/Find-the-Beat runs until double-hits disappear.']);
+    if(cv>0.25)tips.push(['warn','Consistency is holding you back more than speed. Prioritise Metronome Lock.']);
+    if(dr>0.1)tips.push(['warn','You fade over longer runs. Practise Endurance at a lower tempo and stay relaxed.']);
+    if(cps<5)tips.push(['',"Build speed with short sprints, then bring it under control with the metronome."]);
+    if(!tips.length)tips.push(['good','Your recent sessions look solid. Keep pushing tempo in small steps.']);
+    h+=`<div class="card"><h3>Last ${last.length} sessions</h3>
+      <div class="stats"><div class="stat"><span class="mute small">Avg speed</span><b>${f1(cps)}</b></div><div class="stat"><span class="mute small">Avg variation</span><b>${pct(cv)}%</b></div>
+      <div class="stat"><span class="mute small">Alternation</span><b>${pct(alt)}%</b></div><div class="stat"><span class="mute small">Avg drift</span><b>${(dr>=0?'+':'')+pct(dr)}%</b></div></div>
+      <h3 style="margin-top:14px">Recommendations</h3>${tips.map(t=>`<div class="insight ${t[0]}">${t[1]}</div>`).join('')}</div>
+      <div class="grid"><div class="card"><h3>Speed (CPS)</h3>${spark(ss.slice(-30).map(s=>s.cps),'#2563eb',0)}</div>
+      <div class="card"><h3>Variation % (lower is better)</h3>${spark(ss.slice(-30).map(s=>s.cv*100),'#d97706',0)}</div>
+      <div class="card"><h3>Score</h3>${spark(ss.slice(-30).map(s=>s.score),'#16a34a',0,100)}</div></div>`;
+  }else h+='<div class="card"><p class="mute">No sessions yet. Take your first test on the Path tab to see analysis here.</p></div>';
+  h+=`<div class="card"><h3>History</h3>`+(S.sessions.length?`<div style="overflow:auto"><table><tr><th>Date</th><th>Drill</th><th>CPS</th><th>Var</th><th>Alt</th><th>Extra</th></tr>`+
+    S.sessions.slice(-20).reverse().map(s=>`<tr><td>${new Date(s.d).toLocaleDateString()}</td><td>${s.name}</td><td>${f1(s.cps)}</td><td>${pct(s.cv)}%</td><td>${pct(s.alt)}%</td><td>${s.hit!==undefined?pct(s.hit)+'% on-beat':s.surv!==undefined?s.surv+'s':''}</td></tr>`).join('')+'</table></div>':'<p class="mute">Empty.</p>')+'</div>';
+  $('#view-stats').innerHTML=h;
+}
+function renderSettings(){
+  $('#view-settings').innerHTML=`<div class="card"><h2>Settings</h2>
+   <p class="mute small">Choose the two keys you'll alternate between. On touch screens use the on-screen L/R pads.</p>
+   <div class="row"><button id="kb0">Key 1 (L): <span class="kbd">${rebind&&rebind.i===0?'press a key…':keyName(S.keys[0])}</span></button>
+   <button id="kb1">Key 2 (R): <span class="kbd">${rebind&&rebind.i===1?'press a key…':keyName(S.keys[1])}</span></button></div>
+   <h3 style="margin-top:16px">Metronome volume</h3><input id="sVol" type="range" min="0.1" max="1" step="0.05" value="${S.vol}">
+   <h3 style="margin-top:16px">Audio offset: <span id="sOffL">${S.offset}</span>ms</h3>
+   <p class="mute small">If you consistently tap late on the metronome (Bluetooth audio, etc.), raise this. If you tap early, lower it.</p>
+   <input id="sOff" type="range" min="-150" max="300" step="5" value="${S.offset}"></div>
+   <div class="card"><h3>Data</h3><div class="row"><button id="sExp">Export JSON</button><button id="sReset" class="ghost">Reset all progress</button></div><p id="sOut" class="small mute"></p></div>`;
+  $('#kb0').onclick=()=>{rebind={i:0};renderSettings();};$('#kb1').onclick=()=>{rebind={i:1};renderSettings();};
+  $('#sVol').oninput=e=>{S.vol=+e.target.value;save();};
+  $('#sOff').oninput=e=>{S.offset=+e.target.value;$('#sOffL').textContent=S.offset;save();};
+  $('#sExp').onclick=()=>{$('#sOut').textContent=JSON.stringify(S);};
+  $('#sReset').onclick=()=>{if(confirm('Erase all sessions and level progress?')){S=JSON.parse(JSON.stringify(DEF));save();renderAll();}};
+}
+
+/* ============================== boot ============================== */
+bindPad();renderNav();go('path');
+window.addEventListener('resize',()=>{if(D&&D.state==='done')drawRhythm(analyze(D.taps));});
+</script>
+</body>
+</html>
