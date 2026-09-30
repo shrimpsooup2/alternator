@@ -146,7 +146,7 @@ const LESSONS=[
 {t:'6. Endurance and relaxation',b:`<p>Real spam sections last 5–20 seconds. The <b>drift</b> number in your analysis compares the first and second half of a run: a big positive number means you slow down (tensing up), a big negative one means you panic-speed. Keep shoulders down, breathe, and stay loose.</p>`},
 {t:'7. Taking it into Geometry Dash',b:`<ul>
 <li>Practise in-game with <b>Practice Mode</b> on a spam section at reduced speed (or a custom level with a slow wave) before full speed.</li>
-<li>In the wave, clicks are in/out of hold. A steady tempo keeps the wave flat. The <b>Wave Control</b> drill simulates this: each tap flips direction, so even rhythm keeps you centred in a shrinking corridor.</li>
+<li>In the wave you <b>hold to go up and release to go down</b>. Alternating means two fingers take turns on the button, so the wave is up whenever either finger is down. The <b>Wave Academy</b> simulates this with measured game speeds.</li>
 <li>Match the click speed to the segment. Often you need less than your max; consistency at 70% of your top CPS is ideal.</li>
 <li>Game timing runs on physics ticks, so <em>evenly spaced</em> clicks matter more than peak speed.</li>
 <li>Warm up with 2–3 minutes of the daily session before attempting hard spam sections.</li>
@@ -158,12 +158,14 @@ const LESSONS=[
 <li><b>Fingers colliding or sliding:</b> move the keys a bit apart or adjust hand angle.</li>
 <li><b>Plateau:</b> train at 80% of max for accuracy one day, sprints the next.</li>
 </ul>`},
-{t:'9. Steering the wave and spam types',b:`<p>In the wave simulator every tap flips direction (up/down) at constant speed. So:</p>
-<ul><li><b>Even taps = flat line.</b> A steady rhythm zigzags in place. Faster taps make a smaller zigzag, which is how you fit tight corridors.</li>
-<li><b>Steering = uneven gaps.</b> To drift <em>up</em>, let the up-gap run a little longer than the down-gap. To drift down, do the opposite. You do this by slight timing changes, not by pausing.</li>
-<li><b>Mini waves</b> are steeper and live in tighter corridors, so the zigzag is taller and you need quicker, smaller taps.</li></ul>
-<p><b>Spam types in the Academy:</b> Straight (pure speed), Diagonal (slow steering), Staircase (quick re-centre), Wavy (continuous steering), Tempo-shift (speed up and down as the corridor tightens and loosens), and Gauntlet (all of them chained).</p>
-<p>The coach reads why you crash (double-hits, uneven rhythm, too slow, or bad steering) and adds assists such as strict alternation mode or a guide beat, then removes them as you improve.</p>`},
+{t:'9. How the wave really moves (and how to steer it)',b:`<p><b>Hold = up, release = down.</b> A normal wave travels at exactly <b>45°</b>: its vertical speed equals the level's horizontal speed. A <b>mini wave</b> is twice as steep (<b>63.4°</b>, vertical speed = 2× horizontal), so it covers height twice as fast and needs smaller, quicker clicks.</p>
+<p>Horizontal speeds measured from the game (units/second; 1 block = 30 units): 0.5x = 251.2, 1x = 311.6, 2x = 387.4, 3x = 468, 4x = 576. A faster portal means the wave also moves up and down faster, so the same gap needs faster clicks.</p>
+<ul><li><b>Spamming</b>: alternate fingers rapidly. The wave zigzags in place, and the faster you click, the smaller the zigzag. The HUD shows how many CPS the current gap needs.</li>
+<li><b>Steering = hold ratio.</b> To climb a slope, hold longer than you release. On a 26° slope of a normal wave you hold about 75% of the time; on a 45° slope you just hold.</li>
+<li><b>Diagonals</b>: a 45° corridor needs no spam, only exact hold/release timing at each corner.</li>
+<li><b>Portals</b> change speed or size mid-run. Get ready: faster means faster clicks, mini means smaller, quicker ones.</li></ul>
+<p><b>Spam types in the Academy:</b> Straight, Slope, Hold/release diagonals, Staircase, Slalom, Wavy, Breathing (gap tightens and loosens), Funnel, Drifting, and mixed Gauntlets with speed and size portals.</p>
+<p>The coach reads why you crash (double-hits, uneven rhythm, too slow, wrong hold ratio, bad timing, or portal changes) and adds assists such as a guide beat or strict alternation, then removes them as you improve.</p>`},
 {t:'10. A simple practice plan',b:`<ol><li>Do the <b>Daily Session</b> (Practice tab), about 5 minutes.</li>
 <li>Work the current level on the Path until you pass it the required number of times <em>in a row</em>.</li>
 <li>Check Analysis weekly: is your rating, consistency and L/R balance improving?</li>
@@ -182,7 +184,7 @@ const LEVELS=[
  {id:'endure',name:'Endurance',focus:'Hold 6 CPS for 15s without fading.',need:3,lesson:5,
   drill:{type:'free',name:'Endurance: 15s',dur:15},pass:{cps:6,cv:0.25,drift:0.15}},
  {id:'wave',name:'Wave Control',focus:'Survive the shrinking wave corridor.',need:3,lesson:8,
-  drill:{type:'wave',name:'Wave Control: 20s',dur:20,wave:{kind:'sine',size:'big',diff:0.4,mode:'level'}},pass:{survive:20}},
+  get drill(){return waveCfg('Wave Control: 20s',[{kind:'sine',t:20,cps:5}],{mode:'level'});},pass:{survive:20}},
  {id:'ready',name:'GD Ready',focus:'7+ CPS, steady and clean, for 12s.',need:3,lesson:6,
   drill:{type:'free',name:'GD Ready: 12s',dur:12},pass:{cps:7,cv:0.22,alt:0.95}}
 ];
@@ -232,7 +234,7 @@ function insights(r,cfg){
     add(r.metro.hit>=0.85?'good':'warn',`You hit ${pct(r.metro.hit)}% of beats within half a beat, with ${Math.round(r.metro.mae)}ms average error.`);
     if(Math.abs(r.metro.bias)>15)add('warn',r.metro.bias<0?`You tend to tap early by ~${Math.round(-r.metro.bias)}ms (rushing). Wait for the click.`:`You tend to tap late by ~${Math.round(r.metro.bias)}ms (dragging), or your audio latency is high. Adjust the offset in Settings.`);
   }
-  if(cfg.type==='wave')add(r.survived>=cfg.dur?'good':'warn',r.survived>=cfg.dur?'You survived the whole corridor!':`You crashed after ${f1(r.survived)}s of ${cfg.dur}s.`);
+  if(cfg.type==='wave')add(r.wave&&r.wave.win?'good':'warn',r.wave&&r.wave.win?'You cleared the whole course!':`You crashed ${pct(r.progress||0)}% of the way through (${f1(r.survived)}s).`);
   return out;
 }
 
@@ -249,7 +251,7 @@ function clickAt(perfT,accent){
 }
 
 /* ============================== input ============================== */
-let tapHandler=null,rebind=null;
+let tapHandler=null,releaseHandler=null,rebind=null;
 document.addEventListener('keydown',e=>{
   if(rebind){e.preventDefault();if(e.code!=='Escape'){const other=S.keys[1-rebind.i];
       if(e.code===other){toast('Pick two different keys.');}else{S.keys[rebind.i]=e.code;save();}}
@@ -258,10 +260,17 @@ document.addEventListener('keydown',e=>{
   const i=S.keys.indexOf(e.code);if(i<0)return;
   e.preventDefault();tapHandler(i,e.timeStamp||performance.now());
 });
+document.addEventListener('keyup',e=>{
+  if(!releaseHandler)return;const i=S.keys.indexOf(e.code);if(i<0)return;
+  e.preventDefault();releaseHandler(i,e.timeStamp||performance.now());
+});
+window.addEventListener('blur',()=>{if(releaseHandler){releaseHandler(0,performance.now());releaseHandler(1,performance.now());}});
 function bindPad(){
   [['padL',0],['padR',1]].forEach(([id,h])=>{
     const b=$('#'+id);
-    b.addEventListener('pointerdown',e=>{e.preventDefault();if(tapHandler)tapHandler(h,e.timeStamp||performance.now());});
+    b.addEventListener('pointerdown',e=>{e.preventDefault();try{b.setPointerCapture(e.pointerId);}catch(_){}
+      if(tapHandler)tapHandler(h,e.timeStamp||performance.now());});
+    ['pointerup','pointercancel'].forEach(ev=>b.addEventListener(ev,e=>{if(releaseHandler)releaseHandler(h,e.timeStamp||performance.now());}));
     b.addEventListener('contextmenu',e=>e.preventDefault());
     b.addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='Enter')e.preventDefault();});
   });
@@ -269,6 +278,9 @@ function bindPad(){
 function flash(h,bad){
   const b=$(h===0?'#padL':'#padR');b.classList.add('hit');if(bad)b.classList.add('bad');
   setTimeout(()=>b.classList.remove('hit','bad'),70);
+}
+function holdVis(h,on,bad){
+  const b=$(h===0?'#padL':'#padR');b.classList.toggle('hit',on);b.classList.toggle('bad',on&&!!bad);
 }
 let toastT;function toast(m){const el=$('#msg');el.textContent=m;clearTimeout(toastT);toastT=setTimeout(()=>{if(el.textContent===m)el.textContent='';},2500);}
 
@@ -282,6 +294,7 @@ function fitCanvas(c,h){const dpr=window.devicePixelRatio||1;const w=c.clientWid
 function openDrill(cfg,onDone){
   closeTools();
   D={cfg,onDone,state:'ready',taps:[],scored:[],dbl:0,t0:0,last:-1,data:{}};
+  if(cfg.type==='wave'){D.world=buildWorld(cfg.wave.secs);D.data=waveData();}
   $('#dName').textContent=cfg.name;
   $('#kL').textContent=keyName(S.keys[0]);$('#kR').textContent=keyName(S.keys[1]);
   $('#result').classList.remove('on');$('#result').innerHTML='';
@@ -296,12 +309,12 @@ function openDrill(cfg,onDone){
   }else{
     $('#msg').textContent=cfg.type==='wave'?waveBrief(cfg):
       cfg.taps?`Tap ${cfg.taps} times as fast as you can, alternating. Timer starts on your first tap.`:'Alternate as evenly as you can. Timer starts on your first tap.';
-    tapHandler=onTap;
+    tapHandler=onTap;releaseHandler=cfg.type==='wave'?onRelease:null;
   }
   cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);
 }
 function closeDrill(){
-  cancelAnimationFrame(raf);tapHandler=null;D=null;stopMetroTool();
+  cancelAnimationFrame(raf);tapHandler=null;releaseHandler=null;D=null;stopMetroTool();
   $('#drill').classList.remove('on');document.body.style.overflow='';
 }
 $('#dQuit').onclick=()=>{const cb=D&&D.onQuit;closeDrill();if(cb)cb();renderAll();};
@@ -327,7 +340,7 @@ function onTap(h,t){
   const prev=D.taps[D.taps.length-1];
   const bad=prev&&prev.h===h;
   if(bad)D.dbl++;
-  flash(h,bad);
+  if(cfg.type==='wave')holdVis(h,true,bad);else flash(h,bad);
   D.taps.push({t,h});
   if(cfg.type==='metro'){
     const adj=t-S.offset;
@@ -342,8 +355,12 @@ function onTap(h,t){
       }else D.data.extra++;
     }
   }
-  if(cfg.type==='wave'&&D.data.alive&&!(cfg.wave.strict&&bad))D.data.dir*=-1;
+  if(cfg.type==='wave'&&D.data.alive&&!(cfg.wave.strict&&bad))D.data.down[h]=true;
   if(cfg.taps&&D.taps.length>=cfg.taps)finish();
+}
+function onRelease(h){
+  if(!D||D.cfg.type!=='wave')return;
+  D.data.down[h]=false;holdVis(h,false);
 }
 function liveCps(now){const w=2000,ts=D.taps.filter(x=>x.t>now-w);if(ts.length<2)return 0;return (ts.length-1)/((ts[ts.length-1].t-ts[0].t)/1000);}
 
@@ -366,7 +383,7 @@ function loop(){
 
 /* ---- drawing ---- */
 function drawStage(now){
-  const {x,w,h}=fitCanvas(stage,D.cfg.type==='wave'?240:200);x.clearRect(0,0,w,h);
+  const {x,w,h}=fitCanvas(stage,D.cfg.type==='wave'?WH:200);x.clearRect(0,0,w,h);
   const cfg=D.cfg;
   if(cfg.type==='metro'&&D.beats)drawMetro(x,w,h,now);
   else if(cfg.type==='wave')drawWave(x,w,h);
@@ -401,103 +418,167 @@ function drawMetro(x,w,h,now){
   x.textAlign='left';x.fillStyle='#5f6b82';x.font='12px system-ui';
   x.fillText('Tap when each circle reaches the line. Green bar = on time. Left of a circle = early.',8,14);
 }
-/* ---- wave engine ---- */
-const WV={x:110,scroll:220,H:240,vs:{big:170,mini:210}};
+/* ---- wave engine ----
+   Numbers come from recordings of Geometry Dash 2.2 (physics-lab MEASURED.md): horizontal speed per
+   60fps frame is 4.186, 5.193, 6.457, 7.800, 9.600 for 0.5x-4x, i.e. 251.16 ... 576 units/s. The
+   wave holds a fixed slope: vertical speed = horizontal speed (45 deg); mini wave = 2x (63.4 deg).
+   1 block = 30 units. The hitbox sizes are approximations (wave is much smaller than a cube). */
+const SPEEDS=[251.16,311.58,387.42,468,576],SPD=['0.5x','1x','2x','3x','4x'];
+const BLOCK=30,HB={big:10,mini:6},VM={big:1,mini:2},PPU=1.2,WH=280,HU=200,PLX=110,PHYS=1/240;
 const lerp=(a,b,t)=>a+(b-a)*t;
 const sstep=t=>{t=clamp(t,0,1);return t*t*(3-2*t);};
 const KINDS={
   straight:{name:'Straight spam',desc:'Flat corridor: pure speed and evenness.'},
-  bias:{name:'Diagonal spam',desc:'Corridor slopes up and down: steer with uneven gaps.'},
-  stairs:{name:'Staircase spam',desc:'Corridor steps up and down: re-centre quickly.'},
+  slope:{name:'Slope spam',desc:'Spam up and down ramps: hold longer to climb, release longer to fall.'},
+  diag:{name:'Hold/release diagonals',desc:'45° corridor: no spam, exact hold and release timing.'},
+  stairs:{name:'Staircase spam',desc:'Flat stretches joined by diagonal risers.'},
+  slalom:{name:'Slalom spam',desc:'Quick alternating high and low gaps.'},
   sine:{name:'Wavy spam',desc:'Smooth flowing corridor: constant small steering.'},
-  pulse:{name:'Tempo-shift spam',desc:'Corridor tightens and loosens: change speed on the fly.'},
-  gauntlet:{name:'Gauntlet',desc:'Chains every spam type back to back.'}
+  pulse:{name:'Breathing spam',desc:'Corridor tightens and loosens: change speed on the fly.'},
+  funnel:{name:'Funnel spam',desc:'Wide corridor narrowing down to the tight gap.'},
+  drift:{name:'Drifting spam',desc:'Slow unpredictable wander of the corridor.'},
+  gauntlet:{name:'Gauntlet',desc:'Several spam types, speeds and sizes chained together.'}
 };
-const GSEQ=['straight','bias','pulse','stairs','sine','pulse','bias'];
-function waveGapMin(w){return w.size==='mini'?lerp(64,32,w.diff):lerp(90,36,w.diff);}
-function waveNeed(w){return WV.vs[w.size]/(0.6*waveGapMin(w));}
-function curKind(t){const w=D.cfg.wave;return w.kind==='gauntlet'?GSEQ[Math.floor(t/5)%GSEQ.length]:w.kind;}
-function kindOff(kind,t,df){
-  switch(kind){
-    case 'bias':{const sl=lerp(8,26,df),A=lerp(25,55,df),P=4*A/sl,ph=(t%P)/P;
-      const tri=ph<.25?ph*4:ph<.75?2-ph*4:ph*4-4;return {o:-A*tri,m:1};}
-    case 'stairs':{const A=lerp(22,45,df),st=3.2,k=Math.floor(t/st),L=[0,-1,0,1],f=sstep((t/st-k)/0.22);
-      const cur=L[k%4],prv=k===0?0:L[(k-1)%4];return {o:A*(prv+(cur-prv)*f),m:1};}
-    case 'sine':{const A=lerp(22,48,df),om=lerp(0.5,1.1,df);return {o:A*Math.sin(om*t),m:1};}
-    case 'pulse':return {o:0,m:lerp(1,1.7,0.5+0.5*Math.cos(2*Math.PI*t/6))};
-    default:return {o:0,m:1};
+const GSEQ=['straight','slope','pulse','stairs','sine','slalom','drift','funnel'];
+// CPS at which a centred zigzag uses half the free gap (the gap is generated from this), null = no spam needed
+function secNeed(sc){if(sc.kind==='diag')return null;return sc.V*VM[sc.size]/(2*0.5*Math.max(1,sc.gap-HB[sc.size]));}
+function cfgNeed(cfg){const a=cfg.wave.secs.map(secNeed).filter(v=>v!==null);return a.length?Math.max(...a):null;}
+function mkSec(o){
+  const sp=o.speed===undefined?1:o.speed,size=o.size||'big',V=SPEEDS[sp];let gap=o.gap;
+  if(gap===undefined)gap=o.kind==='diag'?100:V*VM[size]/(2*0.5*(o.cps||6))+HB[size];
+  return {kind:o.kind,t:o.t||10,speed:sp,size,gap,m:o.m,A:o.A,V};
+}
+function secsFrom(list){const out=[];list.forEach(o=>{const oo=Object.assign({},o);if(oo.same&&out.length)oo.gap=out[out.length-1].gap;out.push(mkSec(oo));});return out;}
+function waveCfg(name,list,extra,why){
+  const secs=secsFrom(list),T=secs.reduce((a,x)=>a+x.t,0);
+  const kinds=[...new Set(secs.map(x=>x.kind))],sizes=[...new Set(secs.map(x=>x.size))];
+  const shifts=secs.some((x,i)=>i&&(x.speed!==secs[i-1].speed||x.size!==secs[i-1].size));
+  return {type:'wave',name,dur:T,why,wave:Object.assign({secs,kind:kinds.length===1?kinds[0]:'gauntlet',size:sizes.length===1?sizes[0]:'mixed',shifts,mode:'coach'},extra||{})};
+}
+// centred triangle wave: slope +-m, rising over RL units, starts at 0 going up
+function triOff(xl,m,RL){const A=m*RL/2,f=(xl/(2*RL))%1;return A*(f<0.25?4*f:f<0.75?2-4*f:4*f-4);}
+function secOff(w,xl){
+  const mu=VM[w.size];
+  switch(w.kind){
+    case 'slope':return triOff(xl,w.m||0.3,150);
+    case 'diag':return triOff(xl,mu,w.size==='mini'?40:70);
+    case 'stairs':{const A=w.A||38,SL=200,k=Math.floor(xl/SL),L=[0,-1,0,1],cur=L[k%4],prv=k?L[(k-1)%4]:0,dist=Math.abs(cur-prv)*A;
+      const f=dist?clamp((xl-k*SL)/(dist/mu),0,1):1;return A*(prv+(cur-prv)*f);}
+    case 'slalom':{const A=w.A||52,SL=130,k=Math.floor(xl/SL),cur=k%2?-1:1,prv=k?-cur:0,dist=Math.abs(cur-prv)*A;
+      return A*(prv+(cur-prv)*clamp((xl-k*SL)/(dist/mu),0,1));}
+    case 'sine':return (w.A||38)*Math.sin(2*Math.PI*xl/260);
+    case 'drift':{const ph=w.i*1.7,f=x=>0.6*Math.sin(2*Math.PI*x/420+ph)+0.4*Math.sin(2*Math.PI*x/210+2*ph);return (w.A||40)*(f(xl)-f(0));}
+    default:return 0;
   }
 }
-function corr(t){
-  const w=D.cfg.wave,df=w.diff;let o,m;
-  if(w.kind==='gauntlet'){
-    const seg=Math.floor(t/5),k=GSEQ[seg%GSEQ.length],pk=seg?GSEQ[(seg-1)%GSEQ.length]:k;
-    const a=kindOff(k,t,df),b=kindOff(pk,t,df),f=sstep((t-seg*5)/0.8);
-    o=b.o+(a.o-b.o)*f;m=b.m+(a.m-b.m)*f;
-  }else{const a=kindOff(w.kind,t,df);o=a.o;m=a.m;}
-  const g=waveGapMin(w)*m*(1+0.9*Math.max(0,1-t/2));
-  return {c:clamp(WV.H/2+o,g/2+10,WV.H-g/2-10),g};
+function secGap(w,xl){
+  let gm=1;
+  if(w.kind==='pulse')gm=lerp(1,1.8,0.5+0.5*Math.cos(2*Math.PI*xl/320));
+  else if(w.kind==='funnel')gm=lerp(2,1,sstep(xl/(w.len*0.7)));
+  const TR=w.i?90:w.V*1.2;
+  return lerp(w.prevGap,w.gap*gm,sstep(xl/TR));
 }
+function secCenter(w,xl){const g=secGap(w,xl);return clamp(w.c0+secOff(w,xl),g/2+6,HU-g/2-6);}
+function buildWorld(secs){
+  let x=0,c=HU/2,T=0;const W=[];
+  secs.forEach((sc,i)=>{
+    const len=sc.t*sc.V,w=Object.assign({},sc,{i,x0:x,len,c0:c,T0:T,prevGap:i?W[i-1].gap:sc.gap*1.6});
+    W.push(w);c=secCenter(w,len);x+=len;T+=sc.t;
+  });
+  return {secs:W,L:x,T};
+}
+function secAt(world,s){const a=world.secs;for(let k=0;k<a.length;k++)if(s<a[k].x0+a[k].len)return a[k];return a[a.length-1];}
+function corr(s){const w=secAt(D.world,Math.max(0,s)),xl=Math.min(Math.max(0,s)-w.x0,w.len);return {c:secCenter(w,xl),g:secGap(w,xl),w};}
+// hold fraction needed to follow the corridor's current slope
+function reqDuty(s){const w=secAt(D.world,Math.max(0,s)),sl=(corr(s+8).c-corr(Math.max(0,s-8)).c)/16;return clamp(0.5*(1+sl/VM[w.size]),0,1);}
+function waveData(){return {alive:true,started:false,s:0,y:HU/2,t:0,acc:0,last:0,down:[false,false],hist:[],trail:[],good:0,n:0};}
 function waveInit(){
-  const w=D.cfg.wave;
-  D.data={alive:true,y:0,dir:1,t:0,last:performance.now(),started:true,need:waveNeed(w),off:[],trail:[],vs:WV.vs[w.size]};
-  D.data.y=corr(0).c;
-  if(w.guide){const iv=1000/w.guide,t0=performance.now();D.data.guide={iv,t0};
-    const n=Math.ceil(D.cfg.dur*w.guide)+2;for(let i=1;i<=n;i++)clickAt(t0+i*iv,i%2===0);}
+  const d=D.data,cfg=D.cfg;d.started=true;d.last=performance.now();
+  if(cfg.wave.guide){
+    const t0=performance.now();d.guide=[];
+    D.world.secs.forEach(w=>{const need=secNeed(w);if(need===null)return;
+      const g=clamp(Math.round(need*1.1*2)/2,3.5,12);d.guide.push({T0:w.T0,T1:w.T0+w.t,g});
+      for(let k=1;k/g<w.t;k++)clickAt(t0+(w.T0+k/g)*1000,k%2===0);});
+  }
 }
-function classifyCrash(now){
-  const d=D.data,tp=D.taps,rec=tp.slice(-8);
-  if(tp.length&&now-tp[tp.length-1].t>600)return 'slow';
+function classifyCrash(now,c){
+  const w=c.w,tp=D.taps,rec=tp.slice(-8);
+  if(w.kind==='diag')return 'timing';
   let dbl=0;for(let i=1;i<rec.length;i++)if(rec[i].h===rec[i-1].h)dbl++;
+  if(dbl>=1&&rec.length>4)return 'alt';
+  if(w.i>0){const pv=D.world.secs[w.i-1];if((pv.speed!==w.speed||pv.size!==w.size)&&(D.data.s-w.x0)<w.V*1.2)return 'shift';}
+  const hh=D.data.hist.slice(-60),du=hh.length?avg(hh.map(q=>q.h?1:0)):0.5;
+  if(du>0.9||du<0.1)return 'steer';
   const ints=[];for(let i=1;i<rec.length;i++)ints.push(rec[i].t-rec[i-1].t);
   const m=avg(ints),cv=ints.length>3?Math.sqrt(avg(ints.map(v=>(v-m)**2)))/m:0;
-  if(dbl>=1&&rec.length>4)return 'alt';
+  const need=secNeed(w);
+  if(tp.length&&now-tp[tp.length-1].t>500)return 'slow';
   if(cv>0.35)return 'uneven';
-  if(liveCps(now)<d.need*0.85)return 'slow';
+  if(need&&liveCps(now)<need*0.85)return 'slow';
   return 'steer';
 }
 function waveStep(now){
   const d=D.data;if(!d.alive)return;
-  const dt=Math.min(0.05,(now-d.last)/1000);d.last=now;d.t+=dt;
-  d.y+=d.dir*d.vs*dt;
-  const c=corr(d.t);
-  d.trail.push({t:d.t,y:d.y});while(d.trail.length&&d.trail[0].t<d.t-1.4)d.trail.shift();
-  if(Math.abs(d.y-c.c)>c.g/2){
-    d.alive=false;d.crashT=d.t;d.crashSide=d.y<c.c?'top':'bottom';d.cause=classifyCrash(now);d.kindAt=curKind(d.t);
-    const dd=D;setTimeout(()=>{if(D===dd&&D.state==='run')finish();},600);
-  }else if(d.t>=D.cfg.dur){d.alive=false;d.won=true;finish();}
+  d.acc+=Math.min(0.05,(now-d.last)/1000);d.last=now;
+  while(d.acc>=PHYS&&d.alive){
+    d.acc-=PHYS;
+    const w=secAt(D.world,d.s),held=d.down[0]||d.down[1];
+    d.y+=(held?1:-1)*w.V*VM[w.size]*PHYS;d.s+=w.V*PHYS;d.t+=PHYS;
+    const c=corr(d.s),lim=(c.g-HB[c.w.size])/2,e=d.y-c.c;
+    d.hist.push({h:held,e});if(d.hist.length>260)d.hist.shift();
+    d.trail.push({s:d.s,y:d.y});if(d.trail.length>300)d.trail.shift();
+    d.n++;if(Math.abs(e)<lim*0.5)d.good++;
+    if(Math.abs(e)>lim){
+      d.alive=false;d.crashT=d.t;d.crashSide=e>0?'ceiling':'floor';d.cause=classifyCrash(now,c);d.secIdx=c.w.i;
+      const dd=D;setTimeout(()=>{if(D===dd&&D.state==='run')finish();},600);
+    }else if(d.s>=D.world.L){d.alive=false;d.won=true;finish();}
+  }
 }
 function drawWave(x,w,h){
-  const d=D.data,cfg=D.cfg,wv=cfg.wave,t=d.started?d.t:0,mini=wv.size==='mini';
+  const d=D.data,WD=D.world,s=d.s,py=y=>h-y*PPU,held=d.down[0]||d.down[1];
   x.fillStyle='#e6eefb';x.fillRect(0,0,w,h);
-  x.fillStyle='#1e293b';
-  for(let px=0;px<w;px+=3){const tt=t+(px-WV.x)/WV.scroll;if(tt<0){x.fillRect(px,0,3,h);continue;}
-    const c=corr(tt);x.fillRect(px,0,3,c.c-c.g/2);x.fillRect(px,c.c+c.g/2,3,h);}
+  const cols=[];
+  for(let px=0;px<w;px+=3){const c=corr(s+(px-PLX)/PPU);cols.push({px,top:py(c.c+c.g/2),bot:py(c.c-c.g/2)});}
+  x.fillStyle='#1e293b';cols.forEach(k=>{x.fillRect(k.px,0,3,k.top);x.fillRect(k.px,k.bot,3,h-k.bot);});
   x.strokeStyle='#64748b';x.lineWidth=2;
-  [-1,1].forEach(sg=>{x.beginPath();let first=true;
-    for(let px=0;px<w;px+=3){const tt=t+(px-WV.x)/WV.scroll;if(tt<0)continue;const c=corr(tt);const yy=c.c+sg*c.g/2;first?x.moveTo(px,yy):x.lineTo(px,yy);first=false;}x.stroke();});
-  const dead=d.alive===false&&!d.won,y=d.started?d.y:corr(0).c,dir=d.dir||1,r=mini?5:9;
-  if(d.trail&&d.trail.length>1){x.strokeStyle=dead?'#dc2626':'#2563eb';x.lineWidth=mini?2:3;x.beginPath();
-    d.trail.forEach((p,i)=>{const px=WV.x-(t-p.t)*WV.scroll;i?x.lineTo(px,p.y):x.moveTo(px,p.y);});x.stroke();}
-  x.fillStyle=dead?'#dc2626':'#2563eb';
-  x.beginPath();x.moveTo(WV.x-r,y+dir*r);x.lineTo(WV.x+r,y);x.lineTo(WV.x-r,y-dir*r);x.closePath();x.fill();
+  ['top','bot'].forEach(key=>{x.beginPath();cols.forEach((k,i)=>i?x.lineTo(k.px,k[key]):x.moveTo(k.px,k[key]));x.stroke();});
+  // portals + finish
+  x.font='bold 11px system-ui';
+  WD.secs.forEach(sc=>{if(!sc.i)return;const pv=WD.secs[sc.i-1],px=PLX+(sc.x0-s)*PPU;if(px<-40||px>w+40)return;
+    const ch=[];if(pv.speed!==sc.speed)ch.push(SPD[sc.speed]);if(pv.size!==sc.size)ch.push(sc.size==='mini'?'MINI':'BIG');
+    x.strokeStyle=ch.length?'#7c3aed':'#94a3b8';x.setLineDash([5,4]);x.beginPath();x.moveTo(px,0);x.lineTo(px,h);x.stroke();x.setLineDash([]);
+    if(ch.length){x.fillStyle='#7c3aed';x.fillText(ch.join(' '),px+4,h-6);}});
+  const fx=PLX+(WD.L-s)*PPU;if(fx<w+10){x.strokeStyle='#16a34a';x.lineWidth=4;x.beginPath();x.moveTo(fx,0);x.lineTo(fx,h);x.stroke();}
+  x.lineWidth=2;
+  const cur=d.started?secAt(WD,s):WD.secs[0],dead=!d.alive&&!d.won,mini=cur.size==='mini',y=d.y;
+  if(d.trail.length>1){x.strokeStyle=dead?'#dc2626':'#2563eb';x.lineWidth=mini?2:3;x.beginPath();
+    d.trail.forEach((p,i)=>{const px=PLX+(p.s-s)*PPU;i?x.lineTo(px,py(p.y)):x.moveTo(px,py(p.y));});x.stroke();}
+  const ang=-(held?1:-1)*Math.atan(VM[cur.size]),r=(HB[cur.size]*PPU)*1.1;
+  x.save();x.translate(PLX,py(y));x.rotate(ang);x.fillStyle=dead?'#dc2626':'#2563eb';
+  x.beginPath();x.moveTo(r*1.3,0);x.lineTo(-r,r);x.lineTo(-r*0.4,0);x.lineTo(-r,-r);x.closePath();x.fill();x.restore();
   // guide beat
-  if(d.guide){const ph=((performance.now()-d.guide.t0)%d.guide.iv)/d.guide.iv,i=Math.floor((performance.now()-d.guide.t0)/d.guide.iv);
-    x.globalAlpha=0.35+0.65*(1-ph);x.fillStyle=i%2===0?'#2563eb':'#d97706';x.beginPath();x.arc(w-24,46,12,0,7);x.fill();x.globalAlpha=1;}
-  // label bar
-  x.fillStyle='rgba(255,255,255,.88)';x.fillRect(0,0,w,22);
+  if(d.guide){const e=d.guide.find(q=>d.t>=q.T0&&d.t<q.T1);
+    if(e){const u=(d.t-e.T0)*e.g,ph=u%1,i=Math.floor(u);x.globalAlpha=0.35+0.65*(1-ph);x.fillStyle=i%2===0?'#2563eb':'#d97706';
+      x.beginPath();x.arc(w-24,62,12,0,7);x.fill();x.globalAlpha=1;}}
+  // info bars
+  x.fillStyle='rgba(255,255,255,.9)';x.fillRect(0,0,w,40);
   x.fillStyle='#1b2233';x.font='12px system-ui';
-  const kn=KINDS[wv.kind].name+(wv.kind==='gauntlet'&&d.started?' · '+KINDS[curKind(t)].name:'');
-  x.fillText(`${mini?'MINI':'BIG'} wave · ${kn}${wv.strict?' · strict':''}`,8,15);
-  const live=D.state==='run'?liveCps(performance.now()):0,need=waveNeed(wv);
-  x.textAlign='right';x.fillStyle=live>=need*0.95?'#16a34a':live>=need*0.8?'#d97706':'#dc2626';
-  x.fillText(`need ≈ ${f1(need)} CPS · you ${f1(live)}`,w-8,15);x.textAlign='left';
+  x.fillText(`Section ${cur.i+1}/${WD.secs.length} · ${KINDS[cur.kind].name} · ${cur.size==='mini'?'MINI':'BIG'} · ${SPD[cur.speed]}`,8,15);
+  const live=D.state==='run'?liveCps(performance.now()):0,need=secNeed(cur);
+  x.textAlign='right';
+  if(need!==null){x.fillStyle=live>=need*0.95?'#16a34a':live>=need*0.8?'#d97706':'#dc2626';x.fillText(`need ≈ ${f1(need)} CPS · you ${f1(live)}`,w-8,15);}
+  else{x.fillStyle='#5f6b82';x.fillText('no spam: hold / release on the corners',w-8,15);}
+  x.textAlign='left';x.fillStyle='#5f6b82';
+  const req=reqDuty(s+cur.V*0.12),hh=d.hist.slice(-144),act=hh.length?avg(hh.map(q=>q.h?1:0)):0;
+  if(cur.kind==='diag')x.fillText(req>0.5?'▲ corridor climbs: HOLD':'▼ corridor falls: RELEASE',8,33);
+  else x.fillText(`target hold ≈ ${pct(req)}% · your hold ${pct(act)}%`,8,33);
+  x.textAlign='right';x.fillText(`${pct(clamp(s/WD.L,0,1))}% of course`,w-8,33);x.textAlign='left';
 }
 
 /* ---- finish & results ---- */
 function finish(){
   if(!D||D.state==='done')return;
-  D.state='done';const cfg=D.cfg;tapHandler=null;
+  D.state='done';const cfg=D.cfg;tapHandler=null;releaseHandler=null;holdVis(0,false);holdVis(1,false);
   let taps=D.taps;
   if(cfg.type==='metro')taps=taps.filter(t=>t.t>=D.beats[D.lead]-D.iv*0.6);
   const r=analyze(taps);
@@ -505,7 +586,7 @@ function finish(){
     const errs=[...D.data.hits.values()];
     r.metro={hit:errs.length/cfg.beats,mae:avg(errs.map(Math.abs)),bias:avg(errs),extra:D.data.extra};
   }
-  if(cfg.type==='wave'){r.survived=D.data.won?cfg.dur:(D.data.crashT||D.data.t||0);updateWave(cfg,r);}
+  if(cfg.type==='wave'){r.survived=D.data.won?D.world.T:(D.data.crashT||D.data.t||0);r.progress=D.data.won?1:clamp(D.data.s/D.world.L,0,1);updateWave(cfg,r);}
   const _lm=r.lMean,_rm=r.rMean;
   r.score=cfg.type==='wave'?0:scoreOf(r);
   // level evaluation
@@ -514,7 +595,7 @@ function finish(){
   // persist
   S.sessions.push({d:Date.now(),type:cfg.type,name:cfg.name,cps:+r.cps.toFixed(2),cv:+r.cv.toFixed(3),alt:+r.alt.toFixed(3),
     dbl:r.dbl,drift:+r.drift.toFixed(3),bal:(_lm&&_rm)?+((_rm-_lm)/((_rm+_lm)/2)).toFixed(3):0,cause:r.wave&&r.wave.cause||undefined,kind:cfg.wave&&cfg.wave.kind,size:cfg.wave&&cfg.wave.size,score:Math.round(r.score),hit:r.metro?+r.metro.hit.toFixed(2):undefined,
-    mae:r.metro?Math.round(r.metro.mae):undefined,surv:r.survived!==undefined?+r.survived.toFixed(1):undefined,n:r.n});
+    mae:r.metro?Math.round(r.metro.mae):undefined,surv:r.survived!==undefined?+r.survived.toFixed(1):undefined,prog:r.progress!==undefined?+r.progress.toFixed(2):undefined,n:r.n});
   if(S.sessions.length>300)S.sessions=S.sessions.slice(-300);
   if(r.n>=5&&r.alt>=0.85&&r.cps>S.best&&cfg.type!=='wave')S.best=r.cps;
   if(!S.days.includes(today()))S.days.push(today());
@@ -539,7 +620,7 @@ function evalLevel(L,r){
   if(p.drift!==undefined)c.push({t:`Drift within ±${pct(p.drift)}%`,v:(r.drift>=0?'+':'')+pct(r.drift)+'%',ok:Math.abs(r.drift)<=p.drift});
   if(p.hit!==undefined&&r.metro)c.push({t:`On-beat ≥ ${pct(p.hit)}%`,v:pct(r.metro.hit)+'%',ok:r.metro.hit>=p.hit});
   if(p.mae!==undefined&&r.metro)c.push({t:`Avg timing error ≤ ${p.mae}ms`,v:Math.round(r.metro.mae)+'ms',ok:r.metro.mae<=p.mae});
-  if(p.survive!==undefined)c.push({t:`Survive ${p.survive}s`,v:f1(r.survived||0)+'s',ok:(r.survived||0)>=p.survive});
+  if(p.survive!==undefined)c.push({t:`Clear the ${p.survive}s course`,v:pct(r.progress||0)+'%',ok:!!(r.wave&&r.wave.win)});
   return {checks:c,pass:c.length>0&&c.every(x=>x.ok)};
 }
 function showResult(r,cfg,ev,levelMsg){
@@ -548,7 +629,7 @@ function showResult(r,cfg,ev,levelMsg){
   let h=`<h3>Results</h3><div class="stats">`;
   h+=stat('Speed',f1(r.cps)+' CPS')+stat('Taps',r.n)+stat('Variation',pct(r.cv)+'%')+stat('Alternation',pct(r.alt)+'%');
   if(r.metro)h+=stat('On-beat',pct(r.metro.hit)+'%')+stat('Timing error',Math.round(r.metro.mae)+'ms');
-  if(r.survived!==undefined)h+=stat('Survived',f1(r.survived)+'s');
+  if(r.survived!==undefined)h+=stat('Course',pct(r.progress)+'%')+stat('Time',f1(r.survived)+'s');
   if(cfg.type!=='wave')h+=stat('Score',Math.round(r.score)+'/100');
   h+=stat('Drift',(r.drift>=0?'+':'')+pct(r.drift)+'%');
   h+='</div>';
@@ -764,74 +845,94 @@ function renderSettings(){
 
 /* ============================== wave academy ============================== */
 const TIERS=[{name:'Rookie',wl:0},{name:'Steady',wl:2},{name:'Skilled',wl:4},{name:'Advanced',wl:6},{name:'Master',wl:8}];
+const sc=(kind,t,o)=>Object.assign({kind,t},o||{});
+const CE=(id,tier,name,tip,secs)=>({id,tier,name,tip,secs});
 const CATALOG=[
- {id:'w1',tier:0,name:'Steady Straight',kind:'straight',size:'big',diff:0.05,dur:12,tip:'Find a relaxed rhythm that keeps the wave flat.'},
- {id:'w2',tier:0,name:'Gentle Slope',kind:'bias',size:'big',diff:0.05,dur:14,tip:'To climb, make your up-gaps slightly longer than your down-gaps.'},
- {id:'w3',tier:0,name:'Slow Waves',kind:'sine',size:'big',diff:0.1,dur:15,tip:'Small, continuous adjustments. Do not overcorrect.'},
- {id:'w4',tier:1,name:'Tight Straight',kind:'straight',size:'big',diff:0.3,dur:15,tip:'Smaller zigzags need faster, even taps.'},
- {id:'w5',tier:1,name:'Stair Steps',kind:'stairs',size:'big',diff:0.25,dur:16,tip:'Start the shift as the step arrives, then return to an even rhythm.'},
- {id:'w6',tier:1,name:'Tempo Shift',kind:'pulse',size:'big',diff:0.3,dur:18,tip:'Speed up as the corridor narrows, relax as it opens.'},
- {id:'w7',tier:2,name:'Mini Intro',kind:'straight',size:'mini',diff:0.2,dur:12,tip:'Mini waves are steeper, so taps must be quicker and smaller.'},
- {id:'w8',tier:2,name:'Steep Slope',kind:'bias',size:'big',diff:0.5,dur:18,tip:'Steer with bigger timing differences, but keep the tempo.'},
- {id:'w9',tier:2,name:'Wavy Spam',kind:'sine',size:'big',diff:0.5,dur:20,tip:'Think in flowing curves, not corrections.'},
- {id:'w10',tier:3,name:'Mini Stairs',kind:'stairs',size:'mini',diff:0.4,dur:16,tip:'Quick, decisive re-centring with a fast base tempo.'},
- {id:'w11',tier:3,name:'Mini Tempo Shift',kind:'pulse',size:'mini',diff:0.5,dur:18,tip:'Hold composure while the gap tightens.'},
- {id:'w12',tier:3,name:'Big Gauntlet',kind:'gauntlet',size:'big',diff:0.6,dur:28,tip:'Reset your rhythm at each section change.'},
- {id:'w13',tier:4,name:'Mini Gauntlet',kind:'gauntlet',size:'mini',diff:0.7,dur:28,tip:'Every spam type at mini size.'},
- {id:'w14',tier:4,name:'Endurance Straight',kind:'straight',size:'big',diff:0.8,dur:30,tip:'Stay loose. Tension kills long spam.'},
- {id:'w15',tier:4,name:'Mini Endurance',kind:'straight',size:'mini',diff:0.8,dur:25,tip:'Fast, tiny, relaxed taps.'},
- {id:'w16',tier:4,name:'Master Gauntlet',kind:'gauntlet',size:'mini',diff:0.95,dur:35,tip:'The final exam.'}
+ CE('w1',0,'Steady Straight','Find a relaxed rhythm that keeps the wave level: hold about as long as you release.',[sc('straight',12,{cps:3.5})]),
+ CE('w2',0,'Hold & Release','A 45° corridor: hold while it climbs, release the moment it turns down. No spam.',[sc('diag',14)]),
+ CE('w3',0,'Gentle Slopes','To climb, hold a bit longer than you release. The HUD shows the target hold %.',[sc('slope',15,{cps:3.5,m:0.25})]),
+ CE('w4',1,'Tight Straight','A smaller gap needs faster, even clicks.',[sc('straight',15,{cps:6})]),
+ CE('w5',1,'Stair Steps','Take each 45° riser with a clean hold or release, then go back to spamming.',[sc('stairs',16,{cps:5.5})]),
+ CE('w6',1,'Breathing Spam','Speed up as the corridor tightens, relax as it opens.',[sc('pulse',18,{cps:6})]),
+ CE('w7',1,'Wavy Flow','Small continuous adjustments. Do not overcorrect.',[sc('sine',16,{cps:5.5})]),
+ CE('w8',2,'Mini Intro','Mini waves are twice as steep: zigzags are taller, so clicks must be quicker.',[sc('diag',8,{size:'mini'}),sc('straight',10,{size:'mini',cps:6.5})]),
+ CE('w9',2,'Steep Slopes','A 26° slope means holding about 75% (normal wave). Keep the tempo while you bias it.',[sc('slope',16,{cps:6.5,m:0.5})]),
+ CE('w10',2,'Funnel','Start wide and keep your rhythm as the walls close in.',[sc('funnel',16,{cps:7})]),
+ CE('w11',2,'Fast Lane (2x)','At 2x the wave moves faster too, so the same gap needs faster clicks.',[sc('straight',14,{cps:6.5,speed:2})]),
+ CE('w12',3,'Speed Ladder','The same corridor at 1x, 2x, then 3x. Get faster as the portals hit.',[sc('straight',8,{cps:5,speed:1}),sc('straight',8,{same:true,speed:2}),sc('straight',8,{same:true,speed:3})]),
+ CE('w13',3,'Speed Yo-yo','Speeding up and slowing down on the same gap. Do not get stuck at the old tempo.',[sc('straight',6,{cps:5.5,speed:2}),sc('straight',6,{same:true,speed:1}),sc('straight',6,{same:true,speed:3}),sc('straight',6,{same:true,speed:1}),sc('straight',6,{same:true,speed:2})]),
+ CE('w14',3,'Mini Stairs','Quick, decisive re-centring with a fast base tempo.',[sc('stairs',16,{cps:7.5,size:'mini'})]),
+ CE('w15',3,'Slalom','Sharp alternating gaps: commit to each diagonal.',[sc('slalom',16,{cps:7})]),
+ CE('w16',3,'Drifter','The corridor wanders unpredictably at 2x. Stay loose and keep adjusting.',[sc('drift',18,{cps:7.5,speed:2})]),
+ CE('w17',4,'Mini Speed Changes','Mini wave through 1x, 2x, 3x portals on the same gap.',[sc('straight',6,{cps:7,size:'mini'}),sc('straight',6,{same:true,size:'mini',speed:2}),sc('straight',6,{same:true,size:'mini',speed:1}),sc('straight',6,{same:true,size:'mini',speed:3})]),
+ CE('w18',4,'Portal Gauntlet','Size and speed portals with a new spam type every few seconds.',[sc('straight',5,{cps:6.5}),sc('diag',4,{speed:2}),sc('stairs',6,{cps:7,size:'mini'}),sc('pulse',6,{cps:7.5,speed:2}),sc('slalom',6,{cps:7.5}),sc('sine',6,{cps:8,size:'mini'})]),
+ CE('w19',4,'Endurance (2x)','Thirty seconds of tight 2x spam. Stay loose: tension kills long spam.',[sc('straight',30,{cps:8,speed:2})]),
+ CE('w20',4,'Master Gauntlet','Everything: mini, 3x, every corridor type. The final exam.',[sc('straight',6,{cps:8}),sc('slope',6,{cps:8.5,m:0.5,size:'mini'}),sc('diag',4,{speed:3}),sc('stairs',6,{cps:9,speed:2}),sc('funnel',6,{cps:9.5,size:'mini'}),sc('slalom',6,{cps:9,speed:2,size:'mini'}),sc('drift',6,{cps:10,speed:3}),sc('pulse',8,{cps:10.5,size:'mini',speed:2})])
 ];
 const FLAWS={
- alt:{label:'Double-hits',fix:'Strict-alternation mode: a repeated hand will not flip the wave, so every slip shows up as drift.'},
+ alt:{label:'Double-hits',fix:'Strict-alternation mode: a repeated hand is ignored, so every slip shows up as drift.'},
  uneven:{label:'Uneven rhythm',fix:'A guide beat (audio and visual) paces you at the tempo the corridor needs.'},
  slow:{label:'Speed too low',fix:'Speed ladder: tighter corridors that force faster, smaller zigzags.'},
  fade:{label:'Fading on long runs',fix:'Longer straight holds to build stamina and relaxation.'},
- rush:{label:'Rushing / speeding up',fix:'Guide-beat pulse corridors: hold the tempo while the gap changes.'},
+ rush:{label:'Rushing / speeding up',fix:'Guide-beat breathing corridors: hold the tempo while the gap changes.'},
  balance:{label:'Hand imbalance',fix:'Wavy corridors in strict mode, starting with your weaker hand.'},
- steer:{label:'Steering',fix:'Sloped or stair corridors to practise steering with uneven gaps.'},
- tempo:{label:'Tempo changes',fix:'Tempo-shift corridors that tighten and loosen.'},
+ steer:{label:'Hold ratio / steering',fix:'Slope, stair and slalom corridors to practise biasing hold vs release.'},
+ timing:{label:'Hold/release timing',fix:'Diagonal corridors that need exact hold and release at each corner.'},
+ shift:{label:'Speed and size changes',fix:'Portal runs that change speed and size on the same gap.'},
+ tempo:{label:'Tempo changes',fix:'Breathing corridors that tighten and loosen.'},
  mini:{label:'Mini wave',fix:'Extra mini-wave runs at a gentler difficulty.'}
 };
-const CAUSE={
- alt:'You double-hit shortly before the crash. A repeated hand breaks the see-saw, so the wave keeps going the wrong way.',
- uneven:'Your last few gaps were very uneven, which threw the zigzag off the corridor line.',
- slow:'Your speed dropped below what this corridor needs, so the zigzag grew wider than the gap.',
- steer:'Your rhythm was clean, but the wave drifted off the path. Steer by making the gap in the needed direction a bit longer.'
-};
+function causeText(c,side){
+  switch(c){
+    case 'alt':return 'You double-hit shortly before the crash. Pressing the same finger twice breaks the alternation and your hold rhythm.';
+    case 'uneven':return 'Your last few presses were very uneven, which threw the zigzag off the corridor line.';
+    case 'slow':return 'Your press rate fell below what this gap needs, so each up or down run got longer than the corridor.';
+    case 'timing':return 'Diagonals need exact timing: hold while the corridor climbs, release as soon as it turns down.';
+    case 'shift':return 'You crashed right after a portal changed your speed or size. Anticipate it: faster portals need faster clicks, mini needs smaller, quicker ones.';
+    default:return side==='ceiling'?'Your rhythm was fine but you were holding too much for this stretch. Release sooner or spam a little faster to stay lower.':'Your rhythm was fine but you were releasing too much for this stretch. Hold a bit longer to stay higher.';
+  }
+}
 function waveModel(){return S.wave||(S.wave={wl:null,types:{},sizes:{},stars:{},runs:0});}
 function waveLevel(){const W=waveModel();if(W.wl===null||W.wl===undefined)W.wl=clamp(((S.best||0)-3)*1.2,0,5);return W.wl;}
 function waveTier(){const wl=waveLevel();let t=0;TIERS.forEach((x,i)=>{if(wl>=x.wl)t=i;});return t;}
 function tierStars(i){const W=waveModel();return CATALOG.filter(c=>c.tier===i).reduce((a,c)=>a+(W.stars[c.id]||0),0);}
 function tierUnlocked(i){if(i===0)return true;if(waveLevel()>=TIERS[i].wl)return true;
   const n=CATALOG.filter(c=>c.tier===i-1).length;return tierStars(i-1)>=Math.ceil(n*3*0.5);}
+function diffOf(cfg){const n=cfgNeed(cfg);return n===null?0.3:clamp((n-4)/7,0,1);}
 function updateWave(cfg,r){
-  const W=waveModel(),w=cfg.wave,p=clamp(r.survived/cfg.dur,0,1),win=r.survived>=cfg.dur,before=waveLevel();
+  const W=waveModel(),d=D.data,win=!!d.won,p=win?1:clamp(d.s/D.world.L,0,1),before=waveLevel();
   const ema=(o,key)=>{const e=o[key]||(o[key]={runs:0,prog:p});e.prog=e.runs?e.prog*0.7+p*0.3:p;e.runs++;};
-  ema(W.types,w.kind);ema(W.sizes,w.size);W.runs++;
-  const dl=w.diff*10;let delta;
+  ema(W.types,cfg.wave.kind==='gauntlet'?'gauntlet':cfg.wave.kind);
+  if(cfg.wave.shifts)ema(W.types,'speedshift');
+  [...new Set(cfg.wave.secs.map(x=>x.size))].forEach(z=>ema(W.sizes,z));
+  W.runs++;
+  const dl=diffOf(cfg)*10;let delta;
   if(win)delta=dl>=before-1?0.35:0.12;
   else if(p>0.75)delta=0.05;
   else delta=-0.25*(1-p);
   if(!win&&dl>before+1.5)delta=Math.max(delta,-0.05);
   W.wl=clamp(before+delta,0,10);
-  let stars=0;if(win){stars=1;if(r.alt>=0.95){stars=2;if(r.cv<=0.3)stars=3;}}
-  if(w.id){W.stars[w.id]=Math.max(W.stars[w.id]||0,stars);}
-  const d=D.data;
-  r.wave={before,after:W.wl,stars,cause:d.cause||null,side:d.crashSide,kindAt:d.kindAt,need:d.need,win};
+  const control=d.n?d.good/d.n:0;
+  let stars=0;if(win){stars=1;if(control>=0.65)stars=2;if(stars===2&&control>=0.85&&r.alt>=0.95)stars=3;}
+  if(cfg.wave.id)W.stars[cfg.wave.id]=Math.max(W.stars[cfg.wave.id]||0,stars);
+  r.wave={before,after:W.wl,stars,control,cause:d.cause||null,side:d.crashSide,secIdx:d.secIdx,win};
 }
 function waveReport(r,cfg){
   const w=r.wave,dl=w.after-w.before;
   let h='<h3 style="margin-top:14px">Wave coach</h3>';
-  if(w.win){h+=`<div class="insight good"><b>Cleared!</b>${cfg.wave.id?' '+'★'.repeat(w.stars)+'☆'.repeat(3-w.stars)+' (★ clear · ★★ alternation ≥95% · ★★★ variation ≤30%)':''}</div>`;}
-  else{h+=`<div class="insight warn"><b>Crashed into the ${w.side} wall</b>${cfg.wave.kind==='gauntlet'&&w.kindAt?' during the '+KINDS[w.kindAt].name+' section':''}.${w.cause?' '+CAUSE[w.cause]:''}</div>`;}
+  if(w.win)h+=`<div class="insight good"><b>Cleared!</b> Control ${pct(w.control)}%.${cfg.wave.id?' '+'★'.repeat(w.stars)+'☆'.repeat(3-w.stars)+' (★ clear · ★★ control ≥65% · ★★★ control ≥85% and alternation ≥95%)':''}</div>`;
+  else{const sec=D.world.secs[w.secIdx];
+    h+=`<div class="insight warn"><b>Crashed into the ${w.side}</b> in section ${sec.i+1}/${D.world.secs.length} (${KINDS[sec.kind].name}, ${SPD[sec.speed]}, ${sec.size}) ${pct(r.progress)}% through the course. ${causeText(w.cause,w.side)}</div>`;}
   h+=`<div class="insight">Wave level ${f1(w.before)} → <b>${f1(w.after)}</b> (${dl>=0?'+':''}${f1(dl)}). The coach uses this to set your next difficulty.</div>`;
   return h;
 }
 function waveBrief(cfg){
-  const w=cfg.wave;let t=`${w.size==='mini'?'Mini':'Big'} wave · ${KINDS[w.kind].name}. Needs about ${f1(waveNeed(w))} CPS. Tap either key to start; every tap flips the wave.`;
-  if(w.strict)t+=' Strict mode: a repeated hand will not flip the wave.';
-  if(w.guide)t+=` Follow the ${f1(w.guide)} CPS guide beat.`;
+  const w=cfg.wave,n=cfgNeed(cfg);
+  let t=`HOLD to go up, RELEASE to go down. ${w.size==='mini'?'Mini':w.size==='mixed'?'Mixed-size':'Big'} wave · ${KINDS[w.kind].name} · ${f1(cfg.dur)}s.`;
+  if(n)t+=` Peak need ≈ ${f1(n)} CPS.`;
+  t+=' Alternate fingers (the wave climbs while either key is down). Press either key to start.';
+  if(w.strict)t+=' Strict mode: a repeated hand is ignored.';
+  if(w.guide)t+=' Follow the guide beat.';
   if(w.weak)t+=` Start with your ${w.weak} hand.`;
   if(cfg.why)t+=' '+cfg.why;
   return t;
@@ -846,57 +947,70 @@ function diagnose(){
     set('balance',(Math.abs(a('bal'))-0.06)/0.15);set('slow',(3+waveLevel()*0.6-a('cps'))/3);
   }
   const wr=S.sessions.filter(x=>x.type==='wave'&&x.cause).slice(-12);
-  if(wr.length>=2){const c=k=>wr.filter(x=>x.cause===k).length/wr.length;['alt','uneven','slow','steer'].forEach(k=>set(k,c(k)*1.2));}
-  const T=W.types;
-  if(T.pulse&&T.pulse.runs>=2)set('tempo',(0.7-T.pulse.prog)*2);
-  const st=[T.bias,T.stairs].filter(x=>x&&x.runs>=2);if(st.length)set('steer',(0.7-Math.min(...st.map(x=>x.prog)))*2);
+  if(wr.length>=2){const c=k=>wr.filter(x=>x.cause===k).length/wr.length;['alt','uneven','slow','steer','timing','shift'].forEach(k=>set(k,c(k)*1.2));}
+  const T=W.types,weakP=(o)=>o&&o.runs>=2?(0.7-o.prog)*2:0;
+  set('tempo',weakP(T.pulse));set('shift',weakP(T.speedshift));set('timing',weakP(T.diag));
+  const st=[T.slope,T.stairs,T.slalom].filter(x=>x&&x.runs>=2);if(st.length)set('steer',(0.7-Math.min(...st.map(x=>x.prog)))*2);
   if(W.sizes.mini&&W.sizes.big&&W.sizes.mini.runs>=2)set('mini',(W.sizes.big.prog-W.sizes.mini.prog)*1.5);
   return Object.entries(out).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({k,score:v}));
 }
-function catalogCfg(c,why){return {type:'wave',name:c.name,dur:c.dur,why,wave:{id:c.id,kind:c.kind,size:c.size,diff:c.diff,mode:'catalog'}};}
+function catalogCfg(c,why){return waveCfg(c.name,c.secs,{id:c.id,mode:'catalog'},why);}
 function coachPick(){
-  const W=waveModel(),fl=diagnose(),wl=waveLevel(),df=clamp(wl/10,0.03,0.97),top=fl[0];
+  const W=waveModel(),fl=diagnose(),wl=waveLevel(),df=clamp(wl/10,0.03,0.97),tc=lerp(4.5,11,df),top=fl[0];
   const ss=S.sessions.filter(x=>x.n>=8).slice(-10);
   const weak=avg(ss.map(x=>x.bal||0))>0?'R':'L';
-  const mk=(name,dur,w,k)=>{
-    const wv=Object.assign({kind:'straight',size:'big',diff:df,mode:'coach'},w);
-    if(w.guide)wv.guide=clamp(Math.round(Math.max(waveNeed(wv)*1.1,3.5)*2)/2,3.5,11);
+  const mk=(name,list,extra,k)=>{
     let why=`Coach focus: ${FLAWS[k].label}. ${FLAWS[k].fix}`;
     if(fl[1])why+=` (Also watching: ${FLAWS[fl[1].k].label}.)`;
-    return {type:'wave',name,dur,why,wave:wv};
+    return waveCfg(name,list,extra,why);
   };
   if(!top){
     const next=CATALOG.find(c=>(W.stars[c.id]||0)<1&&tierUnlocked(c.tier));
     if(next)return catalogCfg(next,'No major flaws detected, so the coach is moving you up the Academy. '+next.tip);
-    return {type:'wave',name:'Adaptive Gauntlet',dur:Math.round(clamp(20+wl*1.5,20,40)),
-      why:'Every challenge cleared and no flaws found. This gauntlet scales with your level.',
-      wave:{kind:'gauntlet',size:wl>=4&&Math.random()<0.5?'mini':'big',diff:df,mode:'coach'}};
+    const n=Math.round(clamp(20+wl*1.5,20,40)/5),list=[];
+    for(let i=0;i<n;i++)list.push(sc(GSEQ[i%GSEQ.length],5,{cps:Math.min(tc,11),size:wl>=4&&Math.random()<0.4?'mini':'big',speed:wl>=3&&Math.random()<0.3?2:1}));
+    return waveCfg('Adaptive Gauntlet',list,{},'Every challenge cleared and no flaws found. This gauntlet scales with your level.');
   }
+  const c7=Math.min(tc,7.5);
   switch(top.k){
-    case 'alt':return mk('Clean Alternation Lock',14,{diff:Math.min(df,0.4),strict:true},'alt');
-    case 'uneven':return mk('Rhythm Guide Straight',16,{diff:Math.min(df,0.5),guide:true},'uneven');
-    case 'slow':return mk('Speed Ladder',10,{diff:clamp(df+0.15,0,1)},'slow');
-    case 'fade':return mk('Endurance Hold',Math.round(clamp(22+wl*1.5,22,36)),{diff:df*0.8},'fade');
-    case 'rush':return mk('Hold the Beat',18,{kind:'pulse',guide:true,diff:Math.min(df,0.5)},'rush');
-    case 'balance':return mk(`Weak-Hand Lead (${weak})`,16,{kind:'sine',strict:true,weak,diff:Math.min(df,0.5)},'balance');
-    case 'steer':{const T=W.types,b=T.bias?T.bias.prog:1,s2=T.stairs?T.stairs.prog:1;
-      return mk('Steering Practice',18,{kind:b<=s2?'bias':'stairs',diff:Math.min(df,0.55)},'steer');}
-    case 'tempo':return mk('Tempo Shift Training',18,{kind:'pulse',diff:Math.min(df,0.55)},'tempo');
-    case 'mini':return mk('Mini Wave Practice',14,{size:'mini',kind:wl>=3?'sine':'straight',diff:Math.min(df,0.5)*0.8},'mini');
+    case 'alt':return mk('Clean Alternation Lock',[sc('straight',14,{cps:Math.min(tc,6.5)})],{strict:true},'alt');
+    case 'uneven':return mk('Rhythm Guide Straight',[sc('straight',16,{cps:c7})],{guide:true},'uneven');
+    case 'slow':return mk('Speed Ladder',[sc('straight',10,{cps:tc+1})],{},'slow');
+    case 'fade':return mk('Endurance Hold',[sc('straight',Math.round(clamp(22+wl*1.5,22,36)),{cps:tc*0.85})],{},'fade');
+    case 'rush':return mk('Hold the Beat',[sc('pulse',18,{cps:c7})],{guide:true},'rush');
+    case 'balance':return mk(`Weak-Hand Lead (${weak})`,[sc('sine',16,{cps:c7})],{strict:true,weak},'balance');
+    case 'steer':{const T=W.types,opts=[['slope',T.slope],['stairs',T.stairs],['slalom',T.slalom]].map(([k,v])=>[k,v?v.prog:1]).sort((a,b)=>a[1]-b[1]);
+      return mk('Steering Practice',[sc(opts[0][0],18,{cps:Math.min(tc,8),m:0.4})],{},'steer');}
+    case 'timing':return mk('Corner Timing',[sc('diag',10),sc('diag',10,{size:wl>=4?'mini':'big'}),sc('stairs',10,{cps:Math.min(tc,6)})],{},'timing');
+    case 'shift':{const sp=wl<4?[1,2,1,2]:[1,2,3,1,2],list=sp.map((v,i)=>sc('straight',6,i?{same:true,speed:v}:{cps:Math.min(tc,6.5),speed:v}));
+      return mk('Portal Practice',list,{},'shift');}
+    case 'tempo':return mk('Tempo Shift Training',[sc('pulse',18,{cps:Math.min(tc,8)})],{},'tempo');
+    case 'mini':return mk('Mini Wave Practice',[sc(wl>=3?'sine':'straight',14,{cps:Math.min(tc,7),size:'mini'})],{},'mini');
   }
 }
 function pickChips(c){
-  const w=c.wave,chips=[`<span class="chip">${w.size==='mini'?'Mini':'Big'} wave</span>`,`<span class="chip">${KINDS[w.kind].name}</span>`,`<span class="chip">${c.dur}s</span>`,`<span class="chip">needs ≈ ${f1(waveNeed(w))} CPS</span>`];
+  const w=c.wave,n=cfgNeed(c),sp=[...new Set(w.secs.map(x=>SPD[x.speed]))];
+  const chips=[`<span class="chip">${w.size==='mini'?'Mini':w.size==='mixed'?'Mixed size':'Big'} wave</span>`,`<span class="chip">${KINDS[w.kind].name}</span>`,`<span class="chip">${Math.round(c.dur)}s</span>`,`<span class="chip">${sp.join(' / ')}</span>`];
+  chips.push(n?`<span class="chip">peak ≈ ${f1(n)} CPS</span>`:'<span class="chip">no spam</span>');
   if(w.strict)chips.push('<span class="chip">strict alternation</span>');
-  if(w.guide)chips.push(`<span class="chip">guide beat ${f1(w.guide)} CPS</span>`);
+  if(w.guide)chips.push('<span class="chip">guide beat</span>');
   if(w.weak)chips.push(`<span class="chip">lead with ${w.weak}</span>`);
   return chips.join('');
+}
+function customCfg(o){
+  const list=[],sz=o.size,sp=o.speed;
+  if(o.kind==='gauntlet'){const n=Math.max(2,Math.round(o.dur/5));
+    for(let i=0;i<n;i++){const v=o.shifts?clamp(sp+(i%2),0,4):sp;list.push(sc(GSEQ[i%GSEQ.length],5,Object.assign({size:sz,speed:v},i&&o.shifts?{same:true}:{cps:o.cps})));}}
+  else if(o.shifts){const n=Math.max(2,Math.round(o.dur/6));
+    for(let i=0;i<n;i++)list.push(sc(o.kind,6,{size:sz,speed:clamp(sp+(i%2),0,4),m:0.4,same:i>0,cps:o.cps}));}
+  else list.push(sc(o.kind,o.dur,{size:sz,speed:sp,cps:o.cps,m:0.4}));
+  return waveCfg(`Custom: ${KINDS[o.kind].name}`,list,{strict:o.strict,guide:o.guide,mode:'custom'},'');
 }
 function renderWave(){
   const W=waveModel(),wl=waveLevel(),fl=diagnose(),pick=coachPick(),tier=waveTier();
   const allStars=CATALOG.length*3,got=CATALOG.reduce((a,c)=>a+(W.stars[c.id]||0),0);
   let h=`<div class="card"><h2>Wave Academy</h2>
-   <p class="mute">A wave-spam simulator. Every tap flips the wave up or down, so a steady rhythm keeps it flat and uneven gaps steer it. The coach studies how you fail and builds drills around your weak spots, making the challenges harder as you improve.</p>
+   <p class="mute"><b>Hold to go up, release to go down.</b> A wave-spam simulator using speeds measured from the game (0.5x to 4x), a 45° normal wave and a 63.4° mini wave. The coach studies how you fail and builds drills around your weak spots, making the courses harder as you improve.</p>
    <div class="stats"><div class="stat"><span class="mute small">Wave level</span><b>${f1(wl)}<span class="small mute">/10</span></b></div>
    <div class="stat"><span class="mute small">Tier</span><b>${TIERS[tier].name}</b></div>
    <div class="stat"><span class="mute small">Stars</span><b>${got}/${allStars}</b></div>
@@ -906,33 +1020,32 @@ function renderWave(){
   else h+='<p class="mute">No flaws detected yet. Play a few runs (or any drills) and the coach will learn your habits.</p>';
   h+=`<h3 style="margin-top:14px">Next up: ${pick.name}</h3><div>${pickChips(pick)}</div><p class="small mute">${pick.why||''}</p>
    <button class="primary" id="wCoach">▶ Start coach's pick</button></div>`;
-  const kinds=Object.keys(KINDS).filter(k=>W.types[k]);
-  if(kinds.length){h+='<div class="card"><h3>Your spam-type profile</h3>'+kinds.map(k=>`<div class="flaw"><div class="row"><b>${KINDS[k].name}</b><span class="space"></span><span class="mute small">${Math.round(W.types[k].prog*100)}% avg clear · ${W.types[k].runs} runs</span></div><div class="bar"><i style="width:${Math.round(W.types[k].prog*100)}%;background:var(--good)"></i></div></div>`).join('')+'</div>';}
+  const kinds=Object.keys(W.types);
+  if(kinds.length){h+='<div class="card"><h3>Your spam-type profile</h3>'+kinds.map(k=>{const t=W.types[k],nm=k==='speedshift'?'Speed/size portals':(KINDS[k]?KINDS[k].name:k);
+    return `<div class="flaw"><div class="row"><b>${nm}</b><span class="space"></span><span class="mute small">${Math.round(t.prog*100)}% avg clear · ${t.runs} runs</span></div><div class="bar"><i style="width:${Math.round(t.prog*100)}%;background:var(--good)"></i></div></div>`;}).join('')+'</div>';}
   TIERS.forEach((T,i)=>{
     const un=tierUnlocked(i),items=CATALOG.filter(c=>c.tier===i);
     h+=`<h3 style="margin:18px 0 8px">Tier ${i+1}: ${T.name} ${un?'':'<span class="tag lock">locked</span>'} <span class="small mute">${tierStars(i)}/${items.length*3}★</span></h3>`;
     if(!un)h+=`<p class="small mute">Unlocks at wave level ${T.wl} or with ${Math.ceil(CATALOG.filter(c=>c.tier===i-1).length*1.5)}★ in the tier above.</p>`;
     h+='<div class="grid">'+items.map(c=>{
-      const st=W.stars[c.id]||0,need=waveNeed(c);
-      return `<div class="card lvl ${un?'':'locked'}"><div class="row"><b>${c.name}</b><span class="space"></span><span class="tag ${c.size==='mini'?'mini':''}">${c.size}</span></div>
-      <p class="small mute" style="margin:4px 0">${KINDS[c.kind].name} · ${c.dur}s · needs ≈ ${f1(need)} CPS</p>
+      const st=W.stars[c.id]||0,cf=catalogCfg(c),n=cfgNeed(cf);
+      return `<div class="card lvl ${un?'':'locked'}"><div class="row"><b>${c.name}</b><span class="space"></span><span class="tag ${cf.wave.size!=='big'?'mini':''}">${cf.wave.size}</span></div>
+      <p class="small mute" style="margin:4px 0">${KINDS[cf.wave.kind].name} · ${Math.round(cf.dur)}s · ${[...new Set(cf.wave.secs.map(x=>SPD[x.speed]))].join('/')} · ${n?'peak ≈ '+f1(n)+' CPS':'no spam'}</p>
       <p class="small mute" style="margin:4px 0">${c.tip}</p>
       <div class="row"><span style="color:#d97706;font-size:18px">${'★'.repeat(st)}${'☆'.repeat(3-st)}</span><span class="space"></span><button class="primary" data-w="${c.id}" ${un?'':'disabled'}>Play</button></div></div>`;}).join('')+'</div>';
   });
   h+=`<div class="card" style="margin-top:18px"><h3>Custom challenge</h3><div class="row">
    <label>Type <select id="cuK">${Object.keys(KINDS).map(k=>`<option value="${k}">${KINDS[k].name}</option>`).join('')}</select></label>
    <label>Size <select id="cuS"><option>big</option><option>mini</option></select></label>
+   <label>Speed <select id="cuV">${SPD.map((v,i)=>`<option value="${i}" ${i===1?'selected':''}>${v}</option>`).join('')}</select></label>
    <label>Seconds <select id="cuD">${[10,15,20,30,45].map(v=>`<option ${v===20?'selected':''}>${v}</option>`).join('')}</select></label></div>
-   <div class="row" style="margin-top:8px"><label style="flex:1">Difficulty <b id="cuL">50</b>%<input id="cuF" type="range" min="0" max="100" value="50"></label>
-   <label><input type="checkbox" id="cuX"> strict</label><label><input type="checkbox" id="cuG"> guide beat</label><button class="primary" id="cuGo">Start</button></div></div>`;
+   <div class="row" style="margin-top:8px"><label style="flex:1">Target CPS <b id="cuL">7</b><input id="cuF" type="range" min="4" max="12" step="0.5" value="7"></label></div>
+   <div class="row" style="margin-top:8px"><label><input type="checkbox" id="cuP"> speed changes</label><label><input type="checkbox" id="cuX"> strict</label><label><input type="checkbox" id="cuG"> guide beat</label><span class="space"></span><button class="primary" id="cuGo">Start</button></div></div>`;
   $('#view-wave').innerHTML=h;
   $('#wCoach').onclick=()=>openDrill(pick,null);
   $('#view-wave').querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{const c=CATALOG.find(x=>x.id===b.dataset.w);openDrill(catalogCfg(c,c.tip),null);});
   $('#cuF').oninput=()=>$('#cuL').textContent=$('#cuF').value;
-  $('#cuGo').onclick=()=>{
-    const w={kind:$('#cuK').value,size:$('#cuS').value,diff:+$('#cuF').value/100,strict:$('#cuX').checked,mode:'custom'};
-    if($('#cuG').checked)w.guide=clamp(Math.round(Math.max(waveNeed(w)*1.1,3.5)*2)/2,3.5,11);
-    openDrill({type:'wave',name:`Custom: ${KINDS[w.kind].name} (${w.size})`,dur:+$('#cuD').value,wave:w},null);};
+  $('#cuGo').onclick=()=>openDrill(customCfg({kind:$('#cuK').value,size:$('#cuS').value,speed:+$('#cuV').value,dur:+$('#cuD').value,cps:+$('#cuF').value,shifts:$('#cuP').checked,strict:$('#cuX').checked,guide:$('#cuG').checked}),null);
 }
 
 /* ============================== boot ============================== */
