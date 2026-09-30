@@ -108,7 +108,7 @@ button.sm{padding:3px 10px;font-size:13px}
     <div><span class="mute small">Time</span><b id="hTime">0.0</b></div>
     <div><span class="mute small">Taps</span><b id="hTaps">0</b></div>
     <div><span class="mute small">CPS now</span><b id="hCps">0.0</b></div>
-    <div><span class="mute small">Double-hits</span><b id="hDbl">0</b></div>
+    <div><span class="mute small" id="hDblL">Double-hits</span><b id="hDbl">0</b></div>
   </div>
   <canvas id="stage" height="200"></canvas>
   <div id="msg"></div>
@@ -248,7 +248,7 @@ function insights(r,cfg){
     add(r.metro.hit>=0.85?'good':'warn',`You hit ${pct(r.metro.hit)}% of beats within half a beat, with ${Math.round(r.metro.mae)}ms average error.`);
     if(Math.abs(r.metro.bias)>15)add('warn',r.metro.bias<0?`You tend to tap early by ~${Math.round(-r.metro.bias)}ms (rushing). Wait for the click.`:`You tend to tap late by ~${Math.round(r.metro.bias)}ms (dragging), or your audio latency is high. Adjust the offset in Settings.`);
   }
-  if(cfg.type==='wave')add(r.wave&&r.wave.win?'good':'warn',r.wave&&r.wave.win?'You cleared the whole course!':`You crashed ${pct(r.progress||0)}% of the way through (${f1(r.survived)}s).`);
+  if(cfg.type==='wave'&&r.wave)add(r.wave.win?'good':'warn',r.wave.hardcore?(r.wave.win?'You survived the whole course!':`You crashed ${pct(r.progress||0)}% of the way through (${f1(r.survived)}s).`):`Noclip run: ${r.wave.deaths.length} death${r.wave.deaths.length===1?'':'s'}, ${pct(r.wave.acc)}% accuracy.`);
   return out;
 }
 
@@ -314,6 +314,7 @@ function openDrill(cfg,onDone){
   $('#result').classList.remove('on');$('#result').innerHTML='';
   $('#pad').style.display='';$('#dStop').style.display=(cfg.dur===0&&!cfg.taps)?'':'none';
   ['hTime','hTaps','hCps','hDbl'].forEach(i=>$('#'+i).textContent=i==='hTime'?'0.0':'0');
+  $('#hDblL').textContent=cfg.type==='wave'?'Deaths':'Double-hits';
   $('#drill').classList.add('on');document.body.style.overflow='hidden';
   if(cfg.type==='metro'){
     const go=document.createElement('button');go.className='primary';go.textContent='Start metronome';go.id='goBtn';
@@ -388,7 +389,7 @@ function loop(){
     else if(cfg.dur){$('#hTime').textContent=f1(Math.max(0,cfg.dur-el));if(el>=cfg.dur)finish();}
     else $('#hTime').textContent=f1(el);
     if(D&&D.state==='run'){
-      $('#hTaps').textContent=D.taps.length;$('#hCps').textContent=f1(liveCps(now));$('#hDbl').textContent=D.dbl;
+      $('#hTaps').textContent=D.taps.length;$('#hCps').textContent=f1(liveCps(now));$('#hDbl').textContent=cfg.type==='wave'?D.data.deaths.length:D.dbl;
     }
   }
   if(D&&D.state!=='done')drawStage(now);
@@ -438,7 +439,7 @@ function drawMetro(x,w,h,now){
    wave holds a fixed slope: vertical speed = horizontal speed (45 deg); mini wave = 2x (63.4 deg).
    1 block = 30 units. The hitbox sizes are approximations (wave is much smaller than a cube). */
 const SPEEDS=[251.16,311.58,387.42,468,576],SPD=['0.5x','1x','2x','3x','4x'];
-const BLOCK=30,HB={big:10,mini:6},VM={big:1,mini:2},PPU=1.2,WH=280,HU=200,PLX=110,PHYS=1/240;
+const BLOCK=30,HB={big:10,mini:6},VM={big:1,mini:2},PPU=1.2,WH=296,HU=200,PLX=110,PHYS=1/240;
 const lerp=(a,b,t)=>a+(b-a)*t;
 const sstep=t=>{t=clamp(t,0,1);return t*t*(3-2*t);};
 const KINDS={
@@ -467,7 +468,7 @@ function waveCfg(name,list,extra,why){
   const secs=secsFrom(list),T=secs.reduce((a,x)=>a+x.t,0);
   const kinds=[...new Set(secs.map(x=>x.kind))],sizes=[...new Set(secs.map(x=>x.size))];
   const shifts=secs.some((x,i)=>i&&(x.speed!==secs[i-1].speed||x.size!==secs[i-1].size));
-  return {type:'wave',name,dur:T,why,wave:Object.assign({secs,kind:kinds.length===1?kinds[0]:'gauntlet',size:sizes.length===1?sizes[0]:'mixed',shifts,mode:'coach'},extra||{})};
+  return {type:'wave',name,dur:T,why,wave:Object.assign({secs,kind:kinds.length===1?kinds[0]:'gauntlet',size:sizes.length===1?sizes[0]:'mixed',shifts,mode:'coach',hardcore:!!S.hardcore},extra||{})};
 }
 // centred triangle wave: slope +-m, rising over RL units, starts at 0 going up
 function triOff(xl,m,RL){const A=m*RL/2,f=(xl/(2*RL))%1;return A*(f<0.25?4*f:f<0.75?2-4*f:4*f-4);}
@@ -505,7 +506,7 @@ function secAt(world,s){const a=world.secs;for(let k=0;k<a.length;k++)if(s<a[k].
 function corr(s){const w=secAt(D.world,Math.max(0,s)),xl=Math.min(Math.max(0,s)-w.x0,w.len);return {c:secCenter(w,xl),g:secGap(w,xl),w};}
 // hold fraction needed to follow the corridor's current slope
 function reqDuty(s){const w=secAt(D.world,Math.max(0,s)),sl=(corr(s+8).c-corr(Math.max(0,s-8)).c)/16;return clamp(0.5*(1+sl/VM[w.size]),0,1);}
-function waveData(){return {alive:true,started:false,s:0,y:HU/2,t:0,acc:0,last:0,down:[false,false],hist:[],trail:[],good:0,n:0};}
+function waveData(){return {alive:true,started:false,s:0,y:HU/2,t:0,acc:0,last:0,down:[false,false],hist:[],trail:[],good:0,n:0,wall:0,inWall:false,deaths:[],flashT:-9,lastDeath:-9};}
 function waveInit(){
   const d=D.data,cfg=D.cfg;d.started=true;d.last=performance.now();
   if(cfg.wave.guide){
@@ -532,20 +533,28 @@ function classifyCrash(now,c){
   return 'steer';
 }
 function waveStep(now){
-  const d=D.data;if(!d.alive)return;
+  const d=D.data,hc=!!D.cfg.wave.hardcore;if(!d.alive)return;
   d.acc+=Math.min(0.05,(now-d.last)/1000);d.last=now;
   while(d.acc>=PHYS&&d.alive){
     d.acc-=PHYS;
     const w=secAt(D.world,d.s),held=d.down[0]||d.down[1];
     d.y+=(held?1:-1)*w.V*VM[w.size]*PHYS;d.s+=w.V*PHYS;d.t+=PHYS;
-    const c=corr(d.s),lim=(c.g-HB[c.w.size])/2,e=d.y-c.c;
+    if(!hc)d.y=clamp(d.y,0,HU);             // noclip: the level floor and ceiling still bound you
+    const c=corr(d.s),lim=(c.g-HB[c.w.size])/2,e=d.y-c.c,out=Math.abs(e)>lim;
     d.hist.push({h:held,e});if(d.hist.length>260)d.hist.shift();
     d.trail.push({s:d.s,y:d.y});if(d.trail.length>300)d.trail.shift();
     d.n++;if(Math.abs(e)<lim*0.5)d.good++;
-    if(Math.abs(e)>lim){
-      d.alive=false;d.crashT=d.t;d.crashSide=e>0?'ceiling':'floor';d.cause=classifyCrash(now,c);d.secIdx=c.w.i;
-      const dd=D;setTimeout(()=>{if(D===dd&&D.state==='run')finish();},600);
-    }else if(d.s>=D.world.L){d.alive=false;d.won=true;finish();}
+    if(out)d.wall++;
+    if(out&&!d.inWall&&(hc||d.t-d.lastDeath>=0.3)){   // a new contact with the wall = one death (re-entries within 0.3s are the same incident)
+      const dth={s:d.s,y:d.y,t:d.t,i:c.w.i,side:e>0?'ceiling':'floor',cause:classifyCrash(now,c)};
+      d.deaths.push(dth);d.flashT=d.t;d.lastDeath=d.t;
+      if(hc){
+        d.alive=false;d.crashT=d.t;d.crashSide=dth.side;d.cause=dth.cause;d.secIdx=dth.i;
+        const dd=D;setTimeout(()=>{if(D===dd&&D.state==='run')finish();},600);
+      }
+    }
+    d.inWall=out;
+    if(d.alive&&d.s>=D.world.L){d.alive=false;d.won=true;finish();}
   }
 }
 function drawWave(x,w,h){
@@ -564,18 +573,21 @@ function drawWave(x,w,h){
     if(ch.length){x.fillStyle='#7c3aed';x.fillText(ch.join(' '),px+4,h-6);}});
   const fx=PLX+(WD.L-s)*PPU;if(fx<w+10){x.strokeStyle='#16a34a';x.lineWidth=4;x.beginPath();x.moveTo(fx,0);x.lineTo(fx,h);x.stroke();}
   x.lineWidth=2;
-  const cur=d.started?secAt(WD,s):WD.secs[0],dead=!d.alive&&!d.won,mini=cur.size==='mini',y=d.y;
+  const cur=d.started?secAt(WD,s):WD.secs[0],dead=(!d.alive&&!d.won)||d.inWall,mini=cur.size==='mini',y=d.y;
   if(d.trail.length>1){x.strokeStyle=dead?'#dc2626':'#2563eb';x.lineWidth=mini?2:3;x.beginPath();
     d.trail.forEach((p,i)=>{const px=PLX+(p.s-s)*PPU;i?x.lineTo(px,py(p.y)):x.moveTo(px,py(p.y));});x.stroke();}
   const ang=-(held?1:-1)*Math.atan(VM[cur.size]),r=(HB[cur.size]*PPU)*1.1;
   x.save();x.translate(PLX,py(y));x.rotate(ang);x.fillStyle=dead?'#dc2626':'#2563eb';
   x.beginPath();x.moveTo(r*1.3,0);x.lineTo(-r,r);x.lineTo(-r*0.4,0);x.lineTo(-r,-r);x.closePath();x.fill();x.restore();
+  d.deaths.forEach(q=>{const px=PLX+(q.s-s)*PPU;if(px<-10||px>w+10)return;const yy=py(q.y);
+    x.strokeStyle='#dc2626';x.lineWidth=2.5;x.beginPath();x.moveTo(px-6,yy-6);x.lineTo(px+6,yy+6);x.moveTo(px+6,yy-6);x.lineTo(px-6,yy+6);x.stroke();});
+  if(d.t-d.flashT<0.2){x.fillStyle='rgba(220,38,38,.14)';x.fillRect(0,0,w,h);}
   // guide beat
   if(d.guide){const e=d.guide.find(q=>d.t>=q.T0&&d.t<q.T1);
     if(e){const u=(d.t-e.T0)*e.g,ph=u%1,i=Math.floor(u);x.globalAlpha=0.35+0.65*(1-ph);x.fillStyle=i%2===0?'#2563eb':'#d97706';
       x.beginPath();x.arc(w-24,62,12,0,7);x.fill();x.globalAlpha=1;}}
   // info bars
-  x.fillStyle='rgba(255,255,255,.9)';x.fillRect(0,0,w,40);
+  x.fillStyle='rgba(255,255,255,.92)';x.fillRect(0,0,w,56);
   x.fillStyle='#1b2233';x.font='12px system-ui';
   x.fillText(`Section ${cur.i+1}/${WD.secs.length} · ${KINDS[cur.kind].name} · ${cur.size==='mini'?'MINI':'BIG'} · ${SPD[cur.speed]}`,8,15);
   const live=D.state==='run'?liveCps(performance.now()):0,need=secNeed(cur);
@@ -586,7 +598,10 @@ function drawWave(x,w,h){
   const req=reqDuty(s+cur.V*0.12),hh=d.hist.slice(-144),act=hh.length?avg(hh.map(q=>q.h?1:0)):0;
   if(cur.kind==='diag')x.fillText(req>0.5?'▲ corridor climbs: HOLD':'▼ corridor falls: RELEASE',8,33);
   else x.fillText(`target hold ≈ ${pct(req)}% · your hold ${pct(act)}%`,8,33);
-  x.textAlign='right';x.fillText(`${pct(clamp(s/WD.L,0,1))}% of course`,w-8,33);x.textAlign='left';
+  const accNow=d.n?1-d.wall/d.n:1;
+  x.fillStyle=d.deaths.length?'#dc2626':'#16a34a';x.font='bold 12px system-ui';
+  x.fillText(D.cfg.wave.hardcore?'HARDCORE: one hit ends the run':`NOCLIP · deaths ${d.deaths.length} · accuracy ${pct(accNow)}%`,8,50);
+  x.textAlign='right';x.fillStyle='#5f6b82';x.font='12px system-ui';x.fillText(`${pct(clamp(s/WD.L,0,1))}% of course`,w-8,50);x.textAlign='left';
 }
 
 /* ---- finish & results ---- */
@@ -608,7 +623,7 @@ function finish(){
   if(cfg.level){const L=LEVELS.find(l=>l.id===cfg.level);ev=evalLevel(L,r);}
   // persist
   S.sessions.push({d:Date.now(),type:cfg.type,name:cfg.name,cps:+r.cps.toFixed(2),cv:+r.cv.toFixed(3),alt:+r.alt.toFixed(3),
-    dbl:r.dbl,drift:+r.drift.toFixed(3),bal:(_lm&&_rm)?+((_rm-_lm)/((_rm+_lm)/2)).toFixed(3):0,cause:r.wave&&r.wave.cause||undefined,kind:cfg.wave&&cfg.wave.kind,size:cfg.wave&&cfg.wave.size,score:Math.round(r.score),hit:r.metro?+r.metro.hit.toFixed(2):undefined,
+    dbl:r.dbl,drift:+r.drift.toFixed(3),bal:(_lm&&_rm)?+((_rm-_lm)/((_rm+_lm)/2)).toFixed(3):0,cause:r.wave&&r.wave.cause||undefined,causes:r.wave&&Object.keys(r.wave.causes||{}).length?r.wave.causes:undefined,deaths:r.wave?r.wave.deaths.length:undefined,acc:r.wave?+r.wave.acc.toFixed(3):undefined,kind:cfg.wave&&cfg.wave.kind,size:cfg.wave&&cfg.wave.size,score:Math.round(r.score),hit:r.metro?+r.metro.hit.toFixed(2):undefined,
     mae:r.metro?Math.round(r.metro.mae):undefined,surv:r.survived!==undefined?+r.survived.toFixed(1):undefined,prog:r.progress!==undefined?+r.progress.toFixed(2):undefined,n:r.n});
   if(S.sessions.length>300)S.sessions=S.sessions.slice(-300);
   if(r.n>=5&&r.alt>=0.85&&r.cps>S.best&&cfg.type!=='wave')S.best=r.cps;
@@ -640,7 +655,8 @@ function evalLevel(L,r){
   if(p.drift!==undefined)add(`Drift within ±${pct(p.drift)}%`,(r.drift>=0?'+':'')+pct(r.drift)+'%',Math.abs(r.drift)<=p.drift,Math.abs(r.drift)<=p.drift*0.6,r.drift>=0?'fade':'rush');
   if(p.hit!==undefined&&r.metro)add(`On-beat ≥ ${pct(p.hit)}%`,pct(r.metro.hit)+'%',r.metro.hit>=p.hit,r.metro.hit>=Math.min(0.97,p.hit+0.08),'uneven');
   if(p.mae!==undefined&&r.metro)add(`Avg timing error ≤ ${p.mae}ms`,Math.round(r.metro.mae)+'ms',r.metro.mae<=p.mae,r.metro.mae<=p.mae*0.75,r.metro.bias<-15?'rush':'uneven');
-  if(p.survive!==undefined){const win=!!(r.wave&&r.wave.win);add(`Clear the ${p.survive}s course`,pct(r.progress||0)+'%',win,win,'steer');}
+  if(p.survive!==undefined){const w=r.wave,ok=!!w&&(w.hardcore?w.win:(w.fin&&w.acc>=0.9));
+    add(`Clear the ${p.survive}s course with ≥90% accuracy`,w?(w.hardcore?pct(r.progress)+'%':pct(w.acc)+'% · '+w.deaths.length+' deaths'):'-',ok,!!w&&w.fin&&(w.hardcore||w.acc>=0.98),'steer');}
   return {checks:c,pass:c.length>0&&c.every(x=>x.ok),margin:c.length>0&&c.every(x=>x.m)};
 }
 function showResult(r,cfg,ev,levelMsg){
@@ -649,7 +665,7 @@ function showResult(r,cfg,ev,levelMsg){
   let h=`<h3>Results</h3><div class="stats">`;
   h+=stat('Speed',f1(r.cps)+' CPS')+stat('Taps',r.n)+stat('Variation',pct(r.cv)+'%')+stat('Alternation',pct(r.alt)+'%');
   if(r.metro)h+=stat('On-beat',pct(r.metro.hit)+'%')+stat('Timing error',Math.round(r.metro.mae)+'ms');
-  if(r.survived!==undefined)h+=stat('Course',pct(r.progress)+'%')+stat('Time',f1(r.survived)+'s');
+  if(r.wave)h+=stat('Deaths',r.wave.deaths.length)+stat('Accuracy',pct(r.wave.acc)+'%')+stat('Course',pct(r.progress)+'%');
   if(cfg.type!=='wave')h+=stat('Score',Math.round(r.score)+'/100');
   h+=stat('Drift',(r.drift>=0?'+':'')+pct(r.drift)+'%');
   h+='</div>';
@@ -664,6 +680,7 @@ function showResult(r,cfg,ev,levelMsg){
   R.innerHTML=h;R.classList.add('on');
   $('#pad').style.display='none';$('#dStop').style.display='none';$('#msg').textContent='';
   requestAnimationFrame(()=>drawRhythm(r));
+  if(r.wave&&!r.wave.hardcore)requestAnimationFrame(()=>drawDeathMap(r));
   const cfg0=D.cfg,onDone=D.onDone,queue=D.queue,onQuit=D.onQuit;
   $('#rRetry').onclick=()=>{openDrill(cfg0,onDone);D.queue=queue;D.onQuit=onQuit;};
   if($('#rNext'))$('#rNext').onclick=()=>{runQueue(queue);};
@@ -823,7 +840,7 @@ function critLines(p){
   if(p.cps!==undefined)o.push(`Speed ≥ ${p.cps} CPS`);if(p.cv!==undefined)o.push(`Variation ≤ ${pct(p.cv)}%`);
   if(p.alt!==undefined)o.push(`Alternation ≥ ${pct(p.alt)}%`);if(p.drift!==undefined)o.push(`Drift within ±${pct(p.drift)}%`);
   if(p.hit!==undefined)o.push(`On-beat ≥ ${pct(p.hit)}%`);if(p.mae!==undefined)o.push(`Timing error ≤ ${p.mae}ms`);
-  if(p.survive!==undefined)o.push(`Clear the ${p.survive}s wave course`);
+  if(p.survive!==undefined)o.push(`Finish the ${p.survive}s wave course with ≥90% accuracy (noclip)`);
   return o;
 }
 function continuePath(){
@@ -869,7 +886,7 @@ function heroHtml(nx){
     case 'wave':{const c=CATALOG.find(x=>x.id===nx.step.w),cf=catalogCfg(c),W=waveModel();
       return `<div class="eyebrow">${eb}</div><h2>Wave: ${c.name}</h2><p class="mute">${c.tip}</p>
       <div>${pickChips(cf)}</div>
-      <p class="small mute">Clear it${(nx.step.stars||1)>1?' with at least '+nx.step.stars+' stars':''} to move on. Current: ${'★'.repeat(W.stars[c.id]||0)+'☆'.repeat(3-(W.stars[c.id]||0))}. The steps you are already too good for are skipped automatically.</p>
+      <p class="small mute">Finish it with at least 85% noclip accuracy (or survive, in hardcore mode)${(nx.step.stars||1)>1?' and earn '+nx.step.stars+' stars':''} to move on. Current: ${'★'.repeat(W.stars[c.id]||0)+'☆'.repeat(3-(W.stars[c.id]||0))}. The steps you are already too good for are skipped automatically.</p>
       <div class="row"><button class="primary" id="hGo">Play</button></div>`;}
     case 'detour':return `<div class="eyebrow">Coach detour</div><h2>${nx.cfg.name}</h2><p class="mute">${nx.reason}</p>
       ${nx.cfg.why?`<p class="small mute">${nx.cfg.why}</p>`:''}
@@ -1076,29 +1093,55 @@ function tierUnlocked(i){if(i===0)return true;if(waveLevel()>=TIERS[i].wl)return
   const n=CATALOG.filter(c=>c.tier===i-1).length;return tierStars(i-1)>=Math.ceil(n*3*0.5);}
 function diffOf(cfg){const n=cfgNeed(cfg);return n===null?0.3:clamp((n-4)/7,0,1);}
 function updateWave(cfg,r){
-  const W=waveModel(),d=D.data,win=!!d.won,p=win?1:clamp(d.s/D.world.L,0,1),before=waveLevel();
-  const ema=(o,key)=>{const e=o[key]||(o[key]={runs:0,prog:p});e.prog=e.runs?e.prog*0.7+p*0.3:p;e.runs++;};
-  ema(W.types,cfg.wave.kind==='gauntlet'?'gauntlet':cfg.wave.kind);
+  const W=waveModel(),d=D.data,hc=!!cfg.wave.hardcore,before=waveLevel();
+  const fin=!!d.won,acc=d.n?1-d.wall/d.n:1,deaths=d.deaths.length,prog=fin?1:clamp(d.s/D.world.L,0,1);
+  const win=hc?fin:(fin&&acc>=0.85),q=hc?prog:acc;
+  const ema=(o,key)=>{const e=o[key]||(o[key]={runs:0,prog:q});e.prog=e.runs?e.prog*0.7+q*0.3:q;e.runs++;};
+  ema(W.types,cfg.wave.kind);
   if(cfg.wave.shifts)ema(W.types,'speedshift');
   [...new Set(cfg.wave.secs.map(x=>x.size))].forEach(z=>ema(W.sizes,z));
   W.runs++;
   const dl=diffOf(cfg)*10;let delta;
-  if(win)delta=dl>=before-1?0.35:0.12;
-  else if(p>0.75)delta=0.05;
-  else delta=-0.25*(1-p);
+  if(win)delta=dl>=before-1?(hc||acc>=0.95?0.35:0.22):0.12;
+  else if(q>0.75)delta=0.05;
+  else delta=-0.25*(1-q);
   if(!win&&dl>before+1.5)delta=Math.max(delta,-0.05);
   W.wl=clamp(before+delta,0,10);
-  const control=d.n?d.good/d.n:0;
-  let stars=0;if(win){stars=1;if(control>=0.65)stars=2;if(stars===2&&control>=0.85&&r.alt>=0.95)stars=3;}
+  let stars=0;if(win){stars=1;if(hc||acc>=0.95)stars=2;if(hc||deaths===0)stars=3;}
   if(cfg.wave.id)W.stars[cfg.wave.id]=Math.max(W.stars[cfg.wave.id]||0,stars);
-  r.wave={before,after:W.wl,stars,control,cause:d.cause||null,side:d.crashSide,secIdx:d.secIdx,win};
+  const causes={};d.deaths.forEach(x=>{causes[x.cause]=(causes[x.cause]||0)+1;});
+  const top=Object.entries(causes).sort((a,b)=>b[1]-a[1])[0];
+  r.wave={before,after:W.wl,stars,win,fin,acc,hardcore:hc,causes,cause:top?top[0]:null,
+    side:top?(d.deaths.filter(x=>x.cause===top[0]).map(x=>x.side).sort((a,b)=>d.deaths.filter(y=>y.side===a).length-d.deaths.filter(y=>y.side===b).length).pop()):d.crashSide,
+    secIdx:d.secIdx,deaths:d.deaths.map(x=>({s:x.s,i:x.i,side:x.side,cause:x.cause}))};
+}
+const CAUSE_LABEL={alt:'double-hits',uneven:'uneven rhythm',slow:'pressing too slowly',steer:'hold/release ratio',timing:'corner timing',shift:'portal changes'};
+function drawDeathMap(r){
+  const c=$('#dmap');if(!c||!D)return;const {x,w,h}=fitCanvas(c,70),WD=D.world;x.clearRect(0,0,w,h);
+  const X=v=>8+(w-16)*v/WD.L;
+  WD.secs.forEach((sc,i)=>{x.fillStyle=i%2?'#e6eefb':'#d7e3f7';x.fillRect(X(sc.x0),14,X(sc.x0+sc.len)-X(sc.x0),38);
+    x.fillStyle='#5f6b82';x.font='10px system-ui';x.fillText(String(i+1),X(sc.x0)+3,26);});
+  r.wave.deaths.forEach(q=>{x.fillStyle='rgba(220,38,38,.8)';x.fillRect(X(q.s)-1.5,10,3,46);});
+  x.fillStyle='#5f6b82';x.font='11px system-ui';x.fillText('Death map: red marks are deaths, numbers are course sections',8,h-6);
 }
 function waveReport(r,cfg){
-  const w=r.wave,dl=w.after-w.before;
+  const w=r.wave,dl=w.after-w.before,n=w.deaths.length,N=D.world.secs.length;
+  const secTxt=i=>{const sc=D.world.secs[i];return `section ${sc.i+1}/${N} (${KINDS[sc.kind].name}, ${SPD[sc.speed]}, ${sc.size})`;};
   let h='<h3 style="margin-top:14px">Wave coach</h3>';
-  if(w.win)h+=`<div class="insight good"><b>Cleared!</b> Control ${pct(w.control)}%.${cfg.wave.id?' '+'★'.repeat(w.stars)+'☆'.repeat(3-w.stars)+' (★ clear · ★★ control ≥65% · ★★★ control ≥85% and alternation ≥95%)':''}</div>`;
-  else{const sec=D.world.secs[w.secIdx];
-    h+=`<div class="insight warn"><b>Crashed into the ${w.side}</b> in section ${sec.i+1}/${D.world.secs.length} (${KINDS[sec.kind].name}, ${SPD[sec.speed]}, ${sec.size}) ${pct(r.progress)}% through the course. ${causeText(w.cause,w.side)}</div>`;}
+  const starTxt=cfg.wave.id?' '+'★'.repeat(w.stars)+'☆'.repeat(3-w.stars)+' (★ accuracy ≥85% · ★★ ≥95% · ★★★ zero deaths)':'';
+  if(w.hardcore){
+    if(w.win)h+=`<div class="insight good"><b>Survived the whole course!</b>${starTxt}</div>`;
+    else h+=`<div class="insight warn"><b>Crashed into the ${w.side}</b> in ${secTxt(w.secIdx)} ${pct(r.progress)}% through the course. ${causeText(w.cause,w.side)}</div>`;
+  }else{
+    h+=`<div class="insight ${n===0?'good':w.win?'':'warn'}"><b>${n===0?'Clean run: 0 deaths!':n+' death'+(n>1?'s':'')}</b> · accuracy ${pct(w.acc)}%.${w.win?'':' You need at least 85% accuracy to clear this course.'}${starTxt}</div>`;
+    if(n){
+      const bySec={};w.deaths.forEach(x=>{bySec[x.i]=(bySec[x.i]||0)+1;});
+      const worst=Object.entries(bySec).sort((a,b)=>b[1]-a[1])[0];
+      const breakdown=Object.entries(w.causes).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span class="chip">${CAUSE_LABEL[k]||k} ×${v}</span>`).join('');
+      h+=`<div class="insight warn">Most deaths: ${secTxt(+worst[0])} with ${worst[1]}. Main cause: <b>${CAUSE_LABEL[w.cause]||w.cause}</b>. ${causeText(w.cause,w.side)}<div style="margin-top:6px">${breakdown}</div></div>`;
+    }
+    h+='<canvas id="dmap" height="70" style="margin:8px 0"></canvas>';
+  }
   h+=`<div class="insight">Wave level ${f1(w.before)} → <b>${f1(w.after)}</b> (${dl>=0?'+':''}${f1(dl)}). The coach uses this to set your next difficulty.</div>`;
   return h;
 }
@@ -1106,6 +1149,7 @@ function waveBrief(cfg){
   const w=cfg.wave,n=cfgNeed(cfg);
   let t=`HOLD to go up, RELEASE to go down. ${w.size==='mini'?'Mini':w.size==='mixed'?'Mixed-size':'Big'} wave · ${KINDS[w.kind].name} · ${f1(cfg.dur)}s.`;
   if(n)t+=` Peak need ≈ ${f1(n)} CPS.`;
+  t+=w.hardcore?' HARDCORE: one hit ends the run.':' NOCLIP: hitting a wall counts a death but you keep flying, so the run measures you. Aim for 0 deaths and at least 85% accuracy.';
   t+=' Alternate fingers (the wave climbs while either key is down). Press either key to start.';
   if(w.strict)t+=' Strict mode: a repeated hand is ignored.';
   if(w.guide)t+=' Follow the guide beat.';
@@ -1122,8 +1166,13 @@ function diagnose(){
     set('fade',(a('drift')-0.06)/0.2);set('rush',(-a('drift')-0.08)/0.2);
     set('balance',(Math.abs(a('bal'))-0.06)/0.15);set('slow',(3+waveLevel()*0.6-a('cps'))/3);
   }
-  const wr=S.sessions.filter(x=>x.type==='wave'&&x.cause).slice(-12);
-  if(wr.length>=2){const c=k=>wr.filter(x=>x.cause===k).length/wr.length;['alt','uneven','slow','steer','timing','shift'].forEach(k=>set(k,c(k)*1.2));}
+  const wr=S.sessions.filter(x=>x.type==='wave'&&(x.causes||x.cause)).slice(-12);
+  if(wr.length>=2){
+    const tot={};let all=0;
+    wr.forEach(x=>{Object.entries(x.causes||{[x.cause]:1}).forEach(([k,v])=>{tot[k]=(tot[k]||0)+v;all+=v;});});
+    const sev=clamp(all/wr.length/3,0.3,1);
+    ['alt','uneven','slow','steer','timing','shift'].forEach(k=>set(k,(tot[k]||0)/all*1.2*sev));
+  }
   const T=W.types,weakP=(o)=>o&&o.runs>=2?(0.7-o.prog)*2:0;
   set('tempo',weakP(T.pulse));set('shift',weakP(T.speedshift));set('timing',weakP(T.diag));
   const st=[T.slope,T.stairs,T.slalom].filter(x=>x&&x.runs>=2);if(st.length)set('steer',(0.7-Math.min(...st.map(x=>x.prog)))*2);
@@ -1194,7 +1243,7 @@ function renderWave(){
   h+=`<div class="card"><h3>Coach's diagnosis</h3>`;
   if(fl.length)h+=fl.slice(0,4).map(f=>`<div class="flaw"><div class="row"><b>${FLAWS[f.k].label}</b><span class="space"></span><span class="mute small">${f.score>0.66?'major':f.score>0.4?'moderate':'minor'}</span></div><div class="bar"><i style="width:${Math.round(f.score*100)}%"></i></div><div class="small mute">${FLAWS[f.k].fix}</div></div>`).join('');
   else h+='<p class="mute">No flaws detected yet. Play a few runs (or any drills) and the coach will learn your habits.</p>';
-  h+=`<h3 style="margin-top:14px">Next up: ${pick.name}</h3><div>${pickChips(pick)}</div><p class="small mute">${pick.why||''}</p>
+  h+=`<label class="small" style="display:block;margin:10px 0"><input type="checkbox" id="hcT" ${S.hardcore?'checked':''}> Hardcore mode: a single hit ends the run. Default is <b>noclip</b>: hits count as deaths and you keep flying so the run measures you.</label><h3 style="margin-top:14px">Next up: ${pick.name}</h3><div>${pickChips(pick)}</div><p class="small mute">${pick.why||''}</p>
    <button class="primary" id="wCoach">▶ Start coach's pick</button></div>`;
   const kinds=Object.keys(W.types);
   if(kinds.length){h+='<div class="card"><h3>Your spam-type profile</h3>'+kinds.map(k=>{const t=W.types[k],nm=k==='speedshift'?'Speed/size portals':(KINDS[k]?KINDS[k].name:k);
@@ -1218,6 +1267,7 @@ function renderWave(){
    <div class="row" style="margin-top:8px"><label style="flex:1">Target CPS <b id="cuL">7</b><input id="cuF" type="range" min="4" max="12" step="0.5" value="7"></label></div>
    <div class="row" style="margin-top:8px"><label><input type="checkbox" id="cuP"> speed changes</label><label><input type="checkbox" id="cuX"> strict</label><label><input type="checkbox" id="cuG"> guide beat</label><span class="space"></span><button class="primary" id="cuGo">Start</button></div></div>`;
   $('#view-wave').innerHTML=h;
+  $('#hcT').onchange=e=>{S.hardcore=e.target.checked;save();go('wave');};
   $('#wCoach').onclick=()=>openDrill(pick,null);
   $('#view-wave').querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{const c=CATALOG.find(x=>x.id===b.dataset.w);openDrill(catalogCfg(c,c.tip),null);});
   $('#cuF').oninput=()=>$('#cuL').textContent=$('#cuF').value;
