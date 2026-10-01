@@ -83,6 +83,12 @@ canvas{width:100%;display:block;border-radius:10px;background:#f8fafc;border:1px
 details.stage summary{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 details.stage .bar{flex:1;min-width:80px}
 button.sm{padding:3px 10px;font-size:13px}
+.strip{line-height:0;margin:6px 0}
+.strip i{display:inline-block;width:6px;height:16px;margin:0 1px 2px 0;background:var(--L);border-radius:1px}
+.strip i.R{background:var(--R)}
+.strip i.x{outline:2px solid var(--bad);outline-offset:0}
+.hbar{display:flex;height:14px;border-radius:99px;overflow:hidden;margin:6px 0}
+.hbar i{display:block;height:100%}
 @media(max-width:560px){nav button{padding:6px 8px;font-size:14px}}
 </style>
 </head>
@@ -179,7 +185,7 @@ const LESSONS=[
 <li><b>Diagonals</b>: a 45° corridor needs no spam, only exact hold/release timing at each corner.</li>
 <li><b>Portals</b> change speed or size mid-run. Get ready: faster means faster clicks, mini means smaller, quicker ones.</li></ul>
 <p><b>Spam types in the Academy:</b> Straight, Slope, Hold/release diagonals, Staircase, Slalom, Wavy, Breathing (gap tightens and loosens), Funnel, Drifting, and mixed Gauntlets with speed and size portals.</p>
-<p>The coach reads why you crash (double-hits, uneven rhythm, too slow, wrong hold ratio, bad timing, or portal changes) and adds assists such as a guide beat or strict alternation, then removes them as you improve.</p>`},
+<p>The coach reads why you crash (double-hits, uneven rhythm, too slow, wrong hold ratio, bad timing, or portal changes) and adds assists such as a guide beat or a next-hand cue, then removes them as you improve.</p>`},
 {t:'10. A simple practice plan',b:`<ol><li>Do the <b>Daily Session</b> (Practice tab), about 5 minutes.</li>
 <li>Work the current level on the Path until you pass it the required number of times <em>in a row</em>.</li>
 <li>Check Analysis weekly: is your rating, consistency and L/R balance improving?</li>
@@ -190,15 +196,15 @@ const LEVELS=[
  {id:'basics',name:'Two-Finger Basics',focus:'Alternate cleanly: no double-hits.',need:2,lesson:2,
   drill:{type:'free',name:'Basics: 8s free alternate',dur:8},pass:{cps:3,alt:0.9}},
  {id:'beat',name:'Find the Beat',focus:'Land taps on a slow metronome.',need:2,lesson:3,
-  drill:{type:'metro',name:'Find the Beat (3 CPS)',cps:3,beats:24},pass:{hit:0.8,mae:60}},
+  drill:{type:'metro',name:'Find the Beat (3 CPS)',cps:3,beats:24},pass:{hit:0.8,mae:60,alt:0.9}},
  {id:'smooth',name:'Smooth Speed',focus:'Reach 5 CPS with even spacing.',need:3,lesson:4,
   drill:{type:'free',name:'Smooth Speed: 10s',dur:10},pass:{cps:5,cv:0.3,alt:0.92}},
  {id:'lock',name:'Metronome Lock',focus:'Stay locked to the beat at 5 CPS.',need:3,lesson:3,
-  drill:{type:'metro',name:'Metronome Lock (5 CPS)',cps:5,beats:32},pass:{hit:0.85,mae:45}},
+  drill:{type:'metro',name:'Metronome Lock (5 CPS)',cps:5,beats:32},pass:{hit:0.85,mae:45,alt:0.92}},
  {id:'endure',name:'Endurance',focus:'Hold 6 CPS for 15s without fading.',need:3,lesson:5,
-  drill:{type:'free',name:'Endurance: 15s',dur:15},pass:{cps:6,cv:0.25,drift:0.15}},
+  drill:{type:'free',name:'Endurance: 15s',dur:15},pass:{cps:6,cv:0.25,drift:0.15,alt:0.92}},
  {id:'wave',name:'Wave Control',focus:'Survive the shrinking wave corridor.',need:3,lesson:8,
-  get drill(){return waveCfg('Wave Control: 20s',[{kind:'sine',t:20,cps:5}],{mode:'level'});},pass:{survive:20}},
+  get drill(){return waveCfg('Wave Control: 20s',[{kind:'sine',t:20,cps:5}],{mode:'level'});},pass:{survive:20,alt:0.9}},
  {id:'ready',name:'GD Ready',focus:'7+ CPS, steady and clean, for 12s.',need:3,lesson:6,
   drill:{type:'free',name:'GD Ready: 12s',dur:12},pass:{cps:7,cv:0.22,alt:0.95}}
 ];
@@ -207,7 +213,7 @@ function currentLevel(){for(let i=0;i<LEVELS.length;i++)if(!levelState(LEVELS[i]
 
 /* ============================== analysis ============================== */
 function analyze(taps){
-  const n=taps.length,r={n,cps:0,cv:1,alt:0,dbl:0,dur:0,ints:[],hands:taps.map(t=>t.h),drift:0,lMean:0,rMean:0,mean:0,sd:0};
+  const n=taps.length,r={n,cps:0,cv:1,alt:0,altq:0,share:[0,0],handCps:[0,0],handCv:[0,0],maxRun:0,dom:1,dbl:0,dur:0,ints:[],hands:taps.map(t=>t.h),drift:0,lMean:0,rMean:0,mean:0,sd:0};
   if(n<3)return r;
   let altOk=0,ints=[];
   for(let i=1;i<n;i++){ints.push(taps[i].t-taps[i-1].t);if(taps[i].h!==taps[i-1].h)altOk++;else r.dbl++;}
@@ -220,12 +226,24 @@ function analyze(taps){
   if(half>=2){const m1=avg(ints.slice(0,half)),m2=avg(ints.slice(half));r.drift=(m2-m1)/m1;}
   const L=[],R=[];for(let i=1;i<n;i++)(taps[i].h===0?L:R).push(ints[i-1]);
   r.lMean=L.length?avg(L):0;r.rMean=R.length?avg(R):0;
+  // --- deeper alternation analysis ---
+  const cnt=[0,0];taps.forEach(t=>cnt[t.h]++);
+  r.share=[cnt[0]/n,cnt[1]/n];r.handCps=[cnt[0]/r.dur,cnt[1]/r.dur];
+  let run=1,maxRun=1,maxAt=0;for(let i=1;i<n;i++){if(taps[i].h===taps[i-1].h){run++;if(run>maxRun){maxRun=run;maxAt=i;}}else run=1;}
+  r.maxRun=maxRun;r.maxRunAt=maxAt;
+  const sh=[[],[]],last=[-1,-1];taps.forEach(t=>{if(last[t.h]>=0)sh[t.h].push(t.t-last[t.h]);last[t.h]=t.t;});
+  const cvOf=a=>{if(a.length<3)return 0;const m=avg(a);return Math.sqrt(avg(a.map(v=>(v-m)**2)))/m;};
+  r.handCv=[cvOf(sh[0]),cvOf(sh[1])];r.handGap=[avg(sh[0]),avg(sh[1])];
+  r.dom=Math.max(r.share[0],r.share[1]);
+  const skew=(r.lMean&&r.rMean)?Math.abs(r.rMean-r.lMean)/((r.rMean+r.lMean)/2):0;
+  r.skew=skew;
+  r.altq=0.5*r.alt+0.2*(1-clamp((r.dom-0.5)/0.3,0,1))+0.15*(1-clamp((maxRun-1)/7,0,1))+0.15*(1-clamp(skew/0.3,0,1));
   return r;
 }
 function avg(a){return a.length?a.reduce((x,y)=>x+y,0)/a.length:0;}
 function scoreOf(r){
   if(r.n<5)return 0;
-  return clamp(r.cps/8,0,1)*35+clamp(1-(r.cv-0.08)/0.32,0,1)*40+clamp((r.alt-0.7)/0.3,0,1)*25;
+  return clamp(r.cps/8,0,1)*35+clamp(1-(r.cv-0.08)/0.32,0,1)*40+clamp(((r.altq||r.alt)-0.7)/0.3,0,1)*25;
 }
 function tierOf(s){return s<25?'Beginner':s<45?'Rookie':s<60?'Steady':s<75?'Skilled':s<88?'Advanced':'Master';}
 function rating(){
@@ -235,6 +253,13 @@ function rating(){
 function insights(r,cfg){
   const out=[];const add=(k,t)=>out.push({k,t});
   if(r.n<5){add('warn','Too few taps to analyse. Try again and keep tapping for the whole drill.');return out;}
+  if(r.dom>0.7){const dh=r.share[0]>r.share[1]?'L':'R',wk=dh==='L'?'R':'L';
+    add('warn',`<b>One-handed tapping:</b> ${pct(r.dom)}% of your taps were ${dh}. Alternating means close to 50/50. Your ${wk} hand barely joined in.`);}
+  else if(r.dom<=0.56&&r.n>=10)add('good',`Hand use is even (${pct(r.share[0])}% L / ${pct(r.share[1])}% R).`);
+  if(r.maxRun>=3)add('warn',`Longest same-hand streak: <b>${r.maxRun} taps in a row</b> (around tap ${r.maxRunAt-r.maxRun+2}). Slow down until the see-saw is automatic.`);
+  if(r.n>=10&&r.alt>=0.6&&Math.abs(r.handCv[0]-r.handCv[1])>0.12){const er=r.handCv[0]>r.handCv[1]?'L':'R';
+    add('warn',`Your ${er} hand is the erratic one: its own tap-to-tap timing varies ${pct(Math.max(r.handCv[0],r.handCv[1]))}% against ${pct(Math.min(r.handCv[0],r.handCv[1]))}% for the other.`);}
+  if(r.n>=10&&r.alt>=0.6)add('',`Each hand averaged ${f1(r.handCps[0])} (L) and ${f1(r.handCps[1])} (R) taps per second. With clean alternation each finger only needs half of your total CPS.`);
   if(r.dbl>0&&r.alt<0.9)add('warn',`${r.dbl} double-hit${r.dbl>1?'s':''}: you tapped the same hand twice in a row (${pct(r.alt)}% alternation). Slow down and exaggerate the see-saw motion.`);
   else if(r.alt>=0.97)add('good','Very clean alternation.');
   if(r.lMean&&r.rMean){const d=(r.rMean-r.lMean)/((r.rMean+r.lMean)/2);
@@ -246,6 +271,7 @@ function insights(r,cfg){
   else if(r.drift<-0.12)add('warn',`You sped up ~${pct(-r.drift)}% through the run. Try to hold the start tempo; don't rush.`);
   if(cfg.type==='metro'&&r.metro){
     add(r.metro.hit>=0.85?'good':'warn',`You hit ${pct(r.metro.hit)}% of beats within half a beat, with ${Math.round(r.metro.mae)}ms average error.`);
+    if(r.metro.wrong>0)add('warn',`${r.metro.wrong} tap${r.metro.wrong>1?'s':''} came from the <b>wrong hand</b> for the beat. Taps only score when the hand matches the L/R on the circle.`);
     if(Math.abs(r.metro.bias)>15)add('warn',r.metro.bias<0?`You tend to tap early by ~${Math.round(-r.metro.bias)}ms (rushing). Wait for the click.`:`You tend to tap late by ~${Math.round(r.metro.bias)}ms (dragging), or your audio latency is high. Adjust the offset in Settings.`);
   }
   if(cfg.type==='wave'&&r.wave)add(r.wave.win?'good':'warn',r.wave.hardcore?(r.wave.win?'You survived the whole course!':`You crashed ${pct(r.progress||0)}% of the way through (${f1(r.survived)}s).`):`Noclip run: ${r.wave.deaths.length} death${r.wave.deaths.length===1?'':'s'}, ${pct(r.wave.acc)}% accuracy.`);
@@ -307,7 +333,7 @@ function fitCanvas(c,h){const dpr=window.devicePixelRatio||1;const w=c.clientWid
 
 function openDrill(cfg,onDone){
   closeTools();
-  D={cfg,onDone,state:'ready',taps:[],scored:[],dbl:0,t0:0,last:-1,data:{}};
+  D={cfg,onDone,state:'ready',taps:[],rels:[],scored:[],dbl:0,t0:0,last:-1,data:{}};
   if(cfg.type==='wave'){D.world=buildWorld(cfg.wave.secs);D.data=waveData();}
   $('#dName').textContent=cfg.name;
   $('#kL').textContent=keyName(S.keys[0]);$('#kR').textContent=keyName(S.keys[1]);
@@ -363,18 +389,26 @@ function onTap(h,t){
     if(k>=D.lead&&k<D.beats.length){
       const err=adj-D.beats[k];
       if(Math.abs(err)<D.iv*0.5){
-        const old=D.data.hits.get(k);
-        if(old===undefined||Math.abs(err)<Math.abs(old))D.data.hits.set(k,err);
-        if(old!==undefined)D.data.extra++;
-        D.data.marks.push({k,err,h});
+        if(h!==k%2){D.data.wrong=(D.data.wrong||0)+1;D.data.marks.push({k,err,h,wrong:true});}   // right time, wrong hand: no credit
+        else{
+          const old=D.data.hits.get(k);
+          if(old===undefined||Math.abs(err)<Math.abs(old))D.data.hits.set(k,err);
+          if(old!==undefined)D.data.extra++;
+          D.data.marks.push({k,err,h});
+        }
       }else D.data.extra++;
     }
   }
-  if(cfg.type==='wave'&&D.data.alive&&!(cfg.wave.strict&&bad))D.data.down[h]=true;
+  if(cfg.type==='wave'&&D.data.alive){
+    const d=D.data;
+    if(cfg.wave.lock!==false&&d.lastReg===h){d.faults++;if(d.started)d.faultLog=(d.faultLog||[]).concat({s:d.s,i:secAt(D.world,d.s).i});}   // same hand twice: the press is ignored
+    else{d.down[h]=true;d.lastReg=h;}
+  }
   if(cfg.taps&&D.taps.length>=cfg.taps)finish();
 }
-function onRelease(h){
+function onRelease(h,t){
   if(!D||D.cfg.type!=='wave')return;
+  if(D.data.down[h]||D.state==='run')D.rels.push({t:t||performance.now(),h});
   D.data.down[h]=false;holdVis(h,false);
 }
 function liveCps(now){const w=2000,ts=D.taps.filter(x=>x.t>now-w);if(ts.length<2)return 0;return (ts.length-1)/((ts[ts.length-1].t-ts[0].t)/1000);}
@@ -427,11 +461,11 @@ function drawMetro(x,w,h,now){
   });
   D.data.marks.slice(-30).forEach(m=>{
     const bx=hitX+(D.beats[m.k]-now)*pxms+m.err*pxms;if(bx<-20||bx>w+20)return;
-    const good=Math.abs(m.err)<50;x.fillStyle=good?'#16a34a':Math.abs(m.err)<100?'#d97706':'#dc2626';
+    const good=Math.abs(m.err)<50;x.fillStyle=m.wrong?'#7c3aed':good?'#16a34a':Math.abs(m.err)<100?'#d97706':'#dc2626';
     x.fillRect(bx-2,h/2-34,4,68);
   });
   x.textAlign='left';x.fillStyle='#5f6b82';x.font='12px system-ui';
-  x.fillText('Tap when each circle reaches the line. Green bar = on time. Left of a circle = early.',8,14);
+  x.fillText('Tap with the hand shown on each circle when it reaches the line. Green = on time. Purple = wrong hand (no credit).',8,14);
 }
 /* ---- wave engine ----
    Numbers come from recordings of Geometry Dash 2.2 (physics-lab MEASURED.md): horizontal speed per
@@ -468,7 +502,7 @@ function waveCfg(name,list,extra,why){
   const secs=secsFrom(list),T=secs.reduce((a,x)=>a+x.t,0);
   const kinds=[...new Set(secs.map(x=>x.kind))],sizes=[...new Set(secs.map(x=>x.size))];
   const shifts=secs.some((x,i)=>i&&(x.speed!==secs[i-1].speed||x.size!==secs[i-1].size));
-  return {type:'wave',name,dur:T,why,wave:Object.assign({secs,kind:kinds.length===1?kinds[0]:'gauntlet',size:sizes.length===1?sizes[0]:'mixed',shifts,mode:'coach',hardcore:!!S.hardcore},extra||{})};
+  return {type:'wave',name,dur:T,why,wave:Object.assign({secs,kind:kinds.length===1?kinds[0]:'gauntlet',size:sizes.length===1?sizes[0]:'mixed',shifts,mode:'coach',hardcore:!!S.hardcore,lock:true},extra||{})};
 }
 // centred triangle wave: slope +-m, rising over RL units, starts at 0 going up
 function triOff(xl,m,RL){const A=m*RL/2,f=(xl/(2*RL))%1;return A*(f<0.25?4*f:f<0.75?2-4*f:4*f-4);}
@@ -506,7 +540,7 @@ function secAt(world,s){const a=world.secs;for(let k=0;k<a.length;k++)if(s<a[k].
 function corr(s){const w=secAt(D.world,Math.max(0,s)),xl=Math.min(Math.max(0,s)-w.x0,w.len);return {c:secCenter(w,xl),g:secGap(w,xl),w};}
 // hold fraction needed to follow the corridor's current slope
 function reqDuty(s){const w=secAt(D.world,Math.max(0,s)),sl=(corr(s+8).c-corr(Math.max(0,s-8)).c)/16;return clamp(0.5*(1+sl/VM[w.size]),0,1);}
-function waveData(){return {alive:true,started:false,s:0,y:HU/2,t:0,acc:0,last:0,down:[false,false],hist:[],trail:[],good:0,n:0,wall:0,inWall:false,deaths:[],flashT:-9,lastDeath:-9};}
+function waveData(){return {alive:true,started:false,s:0,y:HU/2,t:0,acc:0,last:0,down:[false,false],hist:[],trail:[],good:0,n:0,faults:0,lastReg:-1,both:0,heldN:0,wall:0,inWall:false,deaths:[],flashT:-9,lastDeath:-9};}
 function waveInit(){
   const d=D.data,cfg=D.cfg;d.started=true;d.last=performance.now();
   if(cfg.wave.guide){
@@ -519,6 +553,7 @@ function waveInit(){
 function classifyCrash(now,c){
   const w=c.w,tp=D.taps,rec=tp.slice(-8);
   if(w.kind==='diag')return 'timing';
+  const r12=tp.slice(-12);if(r12.length>=8&&Math.max(r12.filter(q=>q.h===0).length,r12.filter(q=>q.h===1).length)/r12.length>=0.85)return 'onehand';
   let dbl=0;for(let i=1;i<rec.length;i++)if(rec[i].h===rec[i-1].h)dbl++;
   if(dbl>=1&&rec.length>4)return 'alt';
   if(w.i>0){const pv=D.world.secs[w.i-1];if((pv.speed!==w.speed||pv.size!==w.size)&&(D.data.s-w.x0)<w.V*1.2)return 'shift';}
@@ -544,6 +579,7 @@ function waveStep(now){
     d.hist.push({h:held,e});if(d.hist.length>260)d.hist.shift();
     d.trail.push({s:d.s,y:d.y});if(d.trail.length>300)d.trail.shift();
     d.n++;if(Math.abs(e)<lim*0.5)d.good++;
+    if(held)d.heldN++;if(d.down[0]&&d.down[1])d.both++;
     if(out)d.wall++;
     if(out&&!d.inWall&&(hc||d.t-d.lastDeath>=0.3)){   // a new contact with the wall = one death (re-entries within 0.3s are the same incident)
       const dth={s:d.s,y:d.y,t:d.t,i:c.w.i,side:e>0?'ceiling':'floor',cause:classifyCrash(now,c)};
@@ -582,6 +618,8 @@ function drawWave(x,w,h){
   d.deaths.forEach(q=>{const px=PLX+(q.s-s)*PPU;if(px<-10||px>w+10)return;const yy=py(q.y);
     x.strokeStyle='#dc2626';x.lineWidth=2.5;x.beginPath();x.moveTo(px-6,yy-6);x.lineTo(px+6,yy+6);x.moveTo(px+6,yy-6);x.lineTo(px-6,yy+6);x.stroke();});
   if(d.t-d.flashT<0.2){x.fillStyle='rgba(220,38,38,.14)';x.fillRect(0,0,w,h);}
+  if(D.cfg.wave.cue&&d.alive){const nx=d.lastReg===0?1:0;x.fillStyle=nx?'#d97706':'#2563eb';x.beginPath();x.arc(w-30,98,16,0,7);x.fill();
+    x.fillStyle='#fff';x.font='bold 15px system-ui';x.textAlign='center';x.fillText(nx?'R':'L',w-30,104);x.font='11px system-ui';x.fillStyle='#5f6b82';x.fillText('next',w-30,126);x.textAlign='left';}
   // guide beat
   if(d.guide){const e=d.guide.find(q=>d.t>=q.T0&&d.t<q.T1);
     if(e){const u=(d.t-e.T0)*e.g,ph=u%1,i=Math.floor(u);x.globalAlpha=0.35+0.65*(1-ph);x.fillStyle=i%2===0?'#2563eb':'#d97706';
@@ -613,7 +651,7 @@ function finish(){
   const r=analyze(taps);
   if(cfg.type==='metro'){
     const errs=[...D.data.hits.values()];
-    r.metro={hit:errs.length/cfg.beats,mae:avg(errs.map(Math.abs)),bias:avg(errs),extra:D.data.extra};
+    r.metro={hit:errs.length/cfg.beats,mae:avg(errs.map(Math.abs)),bias:avg(errs),extra:D.data.extra,wrong:D.data.wrong||0};
   }
   if(cfg.type==='wave'){r.survived=D.data.won?D.world.T:(D.data.crashT||D.data.t||0);r.progress=D.data.won?1:clamp(D.data.s/D.world.L,0,1);updateWave(cfg,r);}
   const _lm=r.lMean,_rm=r.rMean;
@@ -623,7 +661,7 @@ function finish(){
   if(cfg.level){const L=LEVELS.find(l=>l.id===cfg.level);ev=evalLevel(L,r);}
   // persist
   S.sessions.push({d:Date.now(),type:cfg.type,name:cfg.name,cps:+r.cps.toFixed(2),cv:+r.cv.toFixed(3),alt:+r.alt.toFixed(3),
-    dbl:r.dbl,drift:+r.drift.toFixed(3),bal:(_lm&&_rm)?+((_rm-_lm)/((_rm+_lm)/2)).toFixed(3):0,cause:r.wave&&r.wave.cause||undefined,causes:r.wave&&Object.keys(r.wave.causes||{}).length?r.wave.causes:undefined,deaths:r.wave?r.wave.deaths.length:undefined,acc:r.wave?+r.wave.acc.toFixed(3):undefined,kind:cfg.wave&&cfg.wave.kind,size:cfg.wave&&cfg.wave.size,score:Math.round(r.score),hit:r.metro?+r.metro.hit.toFixed(2):undefined,
+    dbl:r.dbl,dom:+(r.dom||1).toFixed(2),altq:+(r.altq||0).toFixed(2),hcd:+Math.abs((r.handCv?r.handCv[0]-r.handCv[1]:0)).toFixed(2),drift:+r.drift.toFixed(3),bal:(_lm&&_rm)?+((_rm-_lm)/((_rm+_lm)/2)).toFixed(3):0,cause:r.wave&&r.wave.cause||undefined,causes:r.wave&&Object.keys(r.wave.causes||{}).length?r.wave.causes:undefined,deaths:r.wave?r.wave.deaths.length:undefined,acc:r.wave?+r.wave.acc.toFixed(3):undefined,kind:cfg.wave&&cfg.wave.kind,size:cfg.wave&&cfg.wave.size,score:Math.round(r.score),hit:r.metro?+r.metro.hit.toFixed(2):undefined,
     mae:r.metro?Math.round(r.metro.mae):undefined,surv:r.survived!==undefined?+r.survived.toFixed(1):undefined,prog:r.progress!==undefined?+r.progress.toFixed(2):undefined,n:r.n});
   if(S.sessions.length>300)S.sessions=S.sessions.slice(-300);
   if(r.n>=5&&r.alt>=0.85&&r.cps>S.best&&cfg.type!=='wave')S.best=r.cps;
@@ -671,6 +709,7 @@ function showResult(r,cfg,ev,levelMsg){
   h+='</div>';
   if(ev){h+='<h3 style="margin-top:14px">Level test</h3><table>'+ev.checks.map(c=>`<tr><td>${c.t}</td><td>${c.v}</td><td class="${c.ok?'ok':'no'}">${c.ok?'✔':'✘'}</td></tr>`).join('')+'</table>'+levelMsg;}
   if(r.wave)h+=waveReport(r,cfg);
+  if(r.n>=5)h+=altPanel(r);
   h+='<h3 style="margin-top:14px">Analysis</h3>'+insights(r,cfg).map(i=>`<div class="insight ${i.k}">${i.t}</div>`).join('');
   h+='<h3 style="margin-top:14px">Your rhythm</h3><canvas id="rc" height="160"></canvas>';
   h+='<div class="row" style="margin-top:14px"><button class="primary" id="rRetry">Retry</button>';
@@ -687,6 +726,15 @@ function showResult(r,cfg,ev,levelMsg){
   if($('#rPath'))$('#rPath').onclick=()=>continuePath();
   $('#rClose').onclick=()=>{closeDrill();renderAll();};
   R.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function altPanel(r){
+  const q=Math.round(r.altq*100),st=v=>`<div class="stat"><span class="mute small">${v[0]}</span><b>${v[1]}</b></div>`;
+  const strip=r.hands.slice(-140).map((hh,i,a)=>`<i class="${hh?'R':''}${i&&a[i-1]===hh?' x':''}"></i>`).join('');
+  return `<h3 style="margin-top:14px">Alternation analysis</h3>
+   <div class="stats">${st(['Quality',q+'/100'])}${st(['Alternated',pct(r.alt)+'%'])}${st(['L / R share',pct(r.share[0])+' / '+pct(r.share[1])])}
+   ${st(['Longest streak',r.maxRun+' tap'+(r.maxRun>1?'s':'')])}${st(['Per-hand speed',f1(r.handCps[0])+' / '+f1(r.handCps[1])+' /s'])}${st(['Per-hand evenness',pct(r.handCv[0])+'% / '+pct(r.handCv[1])+'%'])}</div>
+   <div class="hbar"><i style="width:${r.share[0]*100}%;background:var(--L)"></i><i style="width:${r.share[1]*100}%;background:var(--R)"></i></div>
+   <div class="small mute">Every tap in order (blue L, orange R). A red outline marks a tap on the same hand as the one before:</div><div class="strip">${strip}</div>`;
 }
 function drawRhythm(r){
   const c=$('#rc');if(!c)return;const {x,w,h}=fitCanvas(c,160);x.clearRect(0,0,w,h);
@@ -811,6 +859,7 @@ function remedialFor(k){
   if(WAVE_FLAWS.includes(k))return coachPick();
   const best=S.best||4,weak=avg(S.sessions.slice(-10).map(x=>x.bal||0))>0?'R':'L';
   switch(k){
+    case 'onehand':return {type:'metro',name:'Two hands: slow beat',cps:2.5,beats:20,why:'Only the hand shown on each circle scores, so both fingers have to work.'};
     case 'alt':return {type:'metro',name:'Clean alternation: slow beat',cps:3,beats:20,why:'A slow beat makes every double-hit obvious. Focus on see-sawing cleanly.'};
     case 'uneven':return {type:'metro',name:'Rhythm lock',cps:clamp(Math.round(best*0.7),3,7),beats:32,why:'Even spacing is trained against a beat, not by feel.'};
     case 'slow':return {type:'free',dur:0,taps:20,name:'Speed sprint: 20 taps',why:'Short bursts teach your hands what fast feels like.'};
@@ -1063,12 +1112,13 @@ const CATALOG=[
  CE('w20',4,'Master Gauntlet','Everything: mini, 3x, every corridor type. The final exam.',[sc('straight',6,{cps:8}),sc('slope',6,{cps:8.5,m:0.5,size:'mini'}),sc('diag',4,{speed:3}),sc('stairs',6,{cps:9,speed:2}),sc('funnel',6,{cps:9.5,size:'mini'}),sc('slalom',6,{cps:9,speed:2,size:'mini'}),sc('drift',6,{cps:10,speed:3}),sc('pulse',8,{cps:10.5,size:'mini',speed:2})])
 ];
 const FLAWS={
- alt:{label:'Double-hits',fix:'Strict-alternation mode: a repeated hand is ignored, so every slip shows up as drift.'},
+ alt:{label:'Double-hits',fix:'A slow course with a next-hand cue: every press must come from the opposite hand.'},
+ onehand:{label:'One-handed tapping',fix:'Hand cue plus the alternation lock at a slow tempo, so both fingers have to work.'},
  uneven:{label:'Uneven rhythm',fix:'A guide beat (audio and visual) paces you at the tempo the corridor needs.'},
  slow:{label:'Speed too low',fix:'Speed ladder: tighter corridors that force faster, smaller zigzags.'},
  fade:{label:'Fading on long runs',fix:'Longer straight holds to build stamina and relaxation.'},
  rush:{label:'Rushing / speeding up',fix:'Guide-beat breathing corridors: hold the tempo while the gap changes.'},
- balance:{label:'Hand imbalance',fix:'Wavy corridors in strict mode, starting with your weaker hand.'},
+ balance:{label:'Hand imbalance',fix:'Wavy corridors with a next-hand cue, starting with your weaker hand.'},
  steer:{label:'Hold ratio / steering',fix:'Slope, stair and slalom corridors to practise biasing hold vs release.'},
  timing:{label:'Hold/release timing',fix:'Diagonal corridors that need exact hold and release at each corner.'},
  shift:{label:'Speed and size changes',fix:'Portal runs that change speed and size on the same gap.'},
@@ -1077,6 +1127,7 @@ const FLAWS={
 };
 function causeText(c,side){
   switch(c){
+    case 'onehand':return 'Almost all your recent presses came from one hand. Alternation needs both fingers; the other hand must take every second tap.';
     case 'alt':return 'You double-hit shortly before the crash. Pressing the same finger twice breaks the alternation and your hold rhythm.';
     case 'uneven':return 'Your last few presses were very uneven, which threw the zigzag off the corridor line.';
     case 'slow':return 'Your press rate fell below what this gap needs, so each up or down run got longer than the corridor.';
@@ -1095,7 +1146,7 @@ function diffOf(cfg){const n=cfgNeed(cfg);return n===null?0.3:clamp((n-4)/7,0,1)
 function updateWave(cfg,r){
   const W=waveModel(),d=D.data,hc=!!cfg.wave.hardcore,before=waveLevel();
   const fin=!!d.won,acc=d.n?1-d.wall/d.n:1,deaths=d.deaths.length,prog=fin?1:clamp(d.s/D.world.L,0,1);
-  const win=hc?fin:(fin&&acc>=0.85),q=hc?prog:acc;
+  const altOk=r.alt>=0.9,win=(hc?fin:(fin&&acc>=0.85))&&altOk,q=hc?prog:acc;
   const ema=(o,key)=>{const e=o[key]||(o[key]={runs:0,prog:q});e.prog=e.runs?e.prog*0.7+q*0.3:q;e.runs++;};
   ema(W.types,cfg.wave.kind);
   if(cfg.wave.shifts)ema(W.types,'speedshift');
@@ -1107,15 +1158,16 @@ function updateWave(cfg,r){
   else delta=-0.25*(1-q);
   if(!win&&dl>before+1.5)delta=Math.max(delta,-0.05);
   W.wl=clamp(before+delta,0,10);
-  let stars=0;if(win){stars=1;if(hc||acc>=0.95)stars=2;if(hc||deaths===0)stars=3;}
+  let stars=0;if(win){stars=1;if((hc||acc>=0.95)&&r.altq>=0.8)stars=2;if((hc||deaths===0)&&r.altq>=0.9)stars=3;}
   if(cfg.wave.id)W.stars[cfg.wave.id]=Math.max(W.stars[cfg.wave.id]||0,stars);
   const causes={};d.deaths.forEach(x=>{causes[x.cause]=(causes[x.cause]||0)+1;});
   const top=Object.entries(causes).sort((a,b)=>b[1]-a[1])[0];
-  r.wave={before,after:W.wl,stars,win,fin,acc,hardcore:hc,causes,cause:top?top[0]:null,
+  const holds=[[],[]];D.taps.forEach(tp=>{const rl=D.rels.find(x=>x.h===tp.h&&x.t>tp.t);if(rl)holds[tp.h].push(rl.t-tp.t);});
+  r.wave={before,after:W.wl,stars,win,fin,acc,hardcore:hc,altOk,faults:d.faults,hold:[avg(holds[0]),avg(holds[1])],overlap:d.heldN?d.both/d.heldN:0,causes,cause:top?top[0]:null,
     side:top?(d.deaths.filter(x=>x.cause===top[0]).map(x=>x.side).sort((a,b)=>d.deaths.filter(y=>y.side===a).length-d.deaths.filter(y=>y.side===b).length).pop()):d.crashSide,
     secIdx:d.secIdx,deaths:d.deaths.map(x=>({s:x.s,i:x.i,side:x.side,cause:x.cause}))};
 }
-const CAUSE_LABEL={alt:'double-hits',uneven:'uneven rhythm',slow:'pressing too slowly',steer:'hold/release ratio',timing:'corner timing',shift:'portal changes'};
+const CAUSE_LABEL={onehand:'one-handed tapping',alt:'double-hits',uneven:'uneven rhythm',slow:'pressing too slowly',steer:'hold/release ratio',timing:'corner timing',shift:'portal changes'};
 function drawDeathMap(r){
   const c=$('#dmap');if(!c||!D)return;const {x,w,h}=fitCanvas(c,70),WD=D.world;x.clearRect(0,0,w,h);
   const X=v=>8+(w-16)*v/WD.L;
@@ -1133,7 +1185,7 @@ function waveReport(r,cfg){
     if(w.win)h+=`<div class="insight good"><b>Survived the whole course!</b>${starTxt}</div>`;
     else h+=`<div class="insight warn"><b>Crashed into the ${w.side}</b> in ${secTxt(w.secIdx)} ${pct(r.progress)}% through the course. ${causeText(w.cause,w.side)}</div>`;
   }else{
-    h+=`<div class="insight ${n===0?'good':w.win?'':'warn'}"><b>${n===0?'Clean run: 0 deaths!':n+' death'+(n>1?'s':'')}</b> · accuracy ${pct(w.acc)}%.${w.win?'':' You need at least 85% accuracy to clear this course.'}${starTxt}</div>`;
+    h+=`<div class="insight ${n===0?'good':w.win?'':'warn'}"><b>${n===0?'Clean run: 0 deaths!':n+' death'+(n>1?'s':'')}</b> · accuracy ${pct(w.acc)}%.${w.win?'':(w.altOk?' You need at least 85% accuracy to clear this course.':' You also need at least 90% alternation (yours was '+pct(r.alt)+'%).')}${starTxt}</div>`;
     if(n){
       const bySec={};w.deaths.forEach(x=>{bySec[x.i]=(bySec[x.i]||0)+1;});
       const worst=Object.entries(bySec).sort((a,b)=>b[1]-a[1])[0];
@@ -1142,6 +1194,10 @@ function waveReport(r,cfg){
     }
     h+='<canvas id="dmap" height="70" style="margin:8px 0"></canvas>';
   }
+  if(!w.altOk&&w.hardcore)h+=`<div class="insight warn">Alternation check failed: only ${pct(r.alt)}% of your presses switched hands (need 90%).</div>`;
+  if(w.faults)h+=`<div class="insight warn"><b>${w.faults} press${w.faults>1?'es were':' was'} ignored</b> by the alternation lock (same hand twice in a row). On the real game those would be double-taps on one finger.</div>`;
+  if(w.hold[0]&&w.hold[1]){const a=w.hold[0],b=w.hold[1],d=Math.abs(a-b)/((a+b)/2);
+    h+=`<div class="insight ${d>0.3?'warn':''}">Hold length: L ${Math.round(a)}ms, R ${Math.round(b)}ms${d>0.3?` (your ${a>b?'L':'R'} finger stays down ${pct(d)}% longer, which skews the wave when that hand leads)`:''}. Both fingers down at once: ${pct(w.overlap)}% of the time you were holding.</div>`;}
   h+=`<div class="insight">Wave level ${f1(w.before)} → <b>${f1(w.after)}</b> (${dl>=0?'+':''}${f1(dl)}). The coach uses this to set your next difficulty.</div>`;
   return h;
 }
@@ -1151,7 +1207,8 @@ function waveBrief(cfg){
   if(n)t+=` Peak need ≈ ${f1(n)} CPS.`;
   t+=w.hardcore?' HARDCORE: one hit ends the run.':' NOCLIP: hitting a wall counts a death but you keep flying, so the run measures you. Aim for 0 deaths and at least 85% accuracy.';
   t+=' Alternate fingers (the wave climbs while either key is down). Press either key to start.';
-  if(w.strict)t+=' Strict mode: a repeated hand is ignored.';
+  t+=w.lock===false?' Lenient mode: no alternation lock.':' ALTERNATION LOCK: pressing the same hand twice in a row is ignored, so you must really alternate.';
+  if(w.cue)t+=' A cue shows which hand is next.';
   if(w.guide)t+=' Follow the guide beat.';
   if(w.weak)t+=` Start with your ${w.weak} hand.`;
   if(cfg.why)t+=' '+cfg.why;
@@ -1164,14 +1221,15 @@ function diagnose(){
     const a=k=>avg(ss.map(x=>x[k]||0));
     set('alt',(0.95-a('alt'))/0.15);set('uneven',(a('cv')-0.18)/0.25);
     set('fade',(a('drift')-0.06)/0.2);set('rush',(-a('drift')-0.08)/0.2);
-    set('balance',(Math.abs(a('bal'))-0.06)/0.15);set('slow',(3+waveLevel()*0.6-a('cps'))/3);
+    set('balance',Math.max((Math.abs(a('bal'))-0.06)/0.15,(a('hcd')-0.12)/0.25));
+    set('onehand',(a('dom')-0.62)/0.28);set('alt',(0.88-avg(ss.map(x=>x.altq||x.alt)))/0.3);set('slow',(3+waveLevel()*0.6-a('cps'))/3);
   }
   const wr=S.sessions.filter(x=>x.type==='wave'&&(x.causes||x.cause)).slice(-12);
   if(wr.length>=2){
     const tot={};let all=0;
     wr.forEach(x=>{Object.entries(x.causes||{[x.cause]:1}).forEach(([k,v])=>{tot[k]=(tot[k]||0)+v;all+=v;});});
     const sev=clamp(all/wr.length/3,0.3,1);
-    ['alt','uneven','slow','steer','timing','shift'].forEach(k=>set(k,(tot[k]||0)/all*1.2*sev));
+    ['alt','onehand','uneven','slow','steer','timing','shift'].forEach(k=>set(k,(tot[k]||0)/all*1.2*sev));
   }
   const T=W.types,weakP=(o)=>o&&o.runs>=2?(0.7-o.prog)*2:0;
   set('tempo',weakP(T.pulse));set('shift',weakP(T.speedshift));set('timing',weakP(T.diag));
@@ -1198,12 +1256,13 @@ function coachPick(){
   }
   const c7=Math.min(tc,7.5);
   switch(top.k){
-    case 'alt':return mk('Clean Alternation Lock',[sc('straight',14,{cps:Math.min(tc,6.5)})],{strict:true},'alt');
+    case 'alt':return mk('Clean Alternation Lock',[sc('straight',14,{cps:Math.min(tc,6.5)})],{cue:true},'alt');
+    case 'onehand':return mk('Two-Hand Lock',[sc('straight',14,{cps:Math.min(tc,5.5)})],{cue:true},'onehand');
     case 'uneven':return mk('Rhythm Guide Straight',[sc('straight',16,{cps:c7})],{guide:true},'uneven');
     case 'slow':return mk('Speed Ladder',[sc('straight',10,{cps:tc+1})],{},'slow');
     case 'fade':return mk('Endurance Hold',[sc('straight',Math.round(clamp(22+wl*1.5,22,36)),{cps:tc*0.85})],{},'fade');
     case 'rush':return mk('Hold the Beat',[sc('pulse',18,{cps:c7})],{guide:true},'rush');
-    case 'balance':return mk(`Weak-Hand Lead (${weak})`,[sc('sine',16,{cps:c7})],{strict:true,weak},'balance');
+    case 'balance':return mk(`Weak-Hand Lead (${weak})`,[sc('sine',16,{cps:c7})],{cue:true,weak},'balance');
     case 'steer':{const T=W.types,opts=[['slope',T.slope],['stairs',T.stairs],['slalom',T.slalom]].map(([k,v])=>[k,v?v.prog:1]).sort((a,b)=>a[1]-b[1]);
       return mk('Steering Practice',[sc(opts[0][0],18,{cps:Math.min(tc,8),m:0.4})],{},'steer');}
     case 'timing':return mk('Corner Timing',[sc('diag',10),sc('diag',10,{size:wl>=4?'mini':'big'}),sc('stairs',10,{cps:Math.min(tc,6)})],{},'timing');
@@ -1217,7 +1276,8 @@ function pickChips(c){
   const w=c.wave,n=cfgNeed(c),sp=[...new Set(w.secs.map(x=>SPD[x.speed]))];
   const chips=[`<span class="chip">${w.size==='mini'?'Mini':w.size==='mixed'?'Mixed size':'Big'} wave</span>`,`<span class="chip">${KINDS[w.kind].name}</span>`,`<span class="chip">${Math.round(c.dur)}s</span>`,`<span class="chip">${sp.join(' / ')}</span>`];
   chips.push(n?`<span class="chip">peak ≈ ${f1(n)} CPS</span>`:'<span class="chip">no spam</span>');
-  if(w.strict)chips.push('<span class="chip">strict alternation</span>');
+  chips.push(w.lock===false?'<span class="chip">lenient (no alternation lock)</span>':'<span class="chip">alternation lock</span>');
+  if(w.cue)chips.push('<span class="chip">hand cue</span>');
   if(w.guide)chips.push('<span class="chip">guide beat</span>');
   if(w.weak)chips.push(`<span class="chip">lead with ${w.weak}</span>`);
   return chips.join('');
@@ -1229,7 +1289,7 @@ function customCfg(o){
   else if(o.shifts){const n=Math.max(2,Math.round(o.dur/6));
     for(let i=0;i<n;i++)list.push(sc(o.kind,6,{size:sz,speed:clamp(sp+(i%2),0,4),m:0.4,same:i>0,cps:o.cps}));}
   else list.push(sc(o.kind,o.dur,{size:sz,speed:sp,cps:o.cps,m:0.4}));
-  return waveCfg(`Custom: ${KINDS[o.kind].name}`,list,{strict:o.strict,guide:o.guide,mode:'custom'},'');
+  return waveCfg(`Custom: ${KINDS[o.kind].name}`,list,{lock:o.lock,guide:o.guide,mode:'custom'},'');
 }
 function renderWave(){
   const W=waveModel(),wl=waveLevel(),fl=diagnose(),pick=coachPick(),tier=waveTier();
@@ -1265,13 +1325,13 @@ function renderWave(){
    <label>Speed <select id="cuV">${SPD.map((v,i)=>`<option value="${i}" ${i===1?'selected':''}>${v}</option>`).join('')}</select></label>
    <label>Seconds <select id="cuD">${[10,15,20,30,45].map(v=>`<option ${v===20?'selected':''}>${v}</option>`).join('')}</select></label></div>
    <div class="row" style="margin-top:8px"><label style="flex:1">Target CPS <b id="cuL">7</b><input id="cuF" type="range" min="4" max="12" step="0.5" value="7"></label></div>
-   <div class="row" style="margin-top:8px"><label><input type="checkbox" id="cuP"> speed changes</label><label><input type="checkbox" id="cuX"> strict</label><label><input type="checkbox" id="cuG"> guide beat</label><span class="space"></span><button class="primary" id="cuGo">Start</button></div></div>`;
+   <div class="row" style="margin-top:8px"><label><input type="checkbox" id="cuP"> speed changes</label><label><input type="checkbox" id="cuX" checked> alternation lock</label><label><input type="checkbox" id="cuG"> guide beat</label><span class="space"></span><button class="primary" id="cuGo">Start</button></div></div>`;
   $('#view-wave').innerHTML=h;
   $('#hcT').onchange=e=>{S.hardcore=e.target.checked;save();go('wave');};
   $('#wCoach').onclick=()=>openDrill(pick,null);
   $('#view-wave').querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{const c=CATALOG.find(x=>x.id===b.dataset.w);openDrill(catalogCfg(c,c.tip),null);});
   $('#cuF').oninput=()=>$('#cuL').textContent=$('#cuF').value;
-  $('#cuGo').onclick=()=>openDrill(customCfg({kind:$('#cuK').value,size:$('#cuS').value,speed:+$('#cuV').value,dur:+$('#cuD').value,cps:+$('#cuF').value,shifts:$('#cuP').checked,strict:$('#cuX').checked,guide:$('#cuG').checked}),null);
+  $('#cuGo').onclick=()=>openDrill(customCfg({kind:$('#cuK').value,size:$('#cuS').value,speed:+$('#cuV').value,dur:+$('#cuD').value,cps:+$('#cuF').value,shifts:$('#cuP').checked,lock:$('#cuX').checked,guide:$('#cuG').checked}),null);
 }
 
 /* ============================== boot ============================== */
